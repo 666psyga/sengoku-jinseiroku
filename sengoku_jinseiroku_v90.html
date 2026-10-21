@@ -1,0 +1,1895 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>戦国人生録｜試作版 Ver.9.0</title><style>
+:root{font-family:system-ui,'Yu Gothic',Meiryo,sans-serif;background:#111b21;color:#f0e9d9}*{box-sizing:border-box}body{margin:0}.wrap{max-width:620px;margin:auto;padding:16px 14px 80px}header{display:flex;justify-content:space-between;align-items:center}h1{font-size:25px;letter-spacing:.13em;margin:8px 0}h2{font-size:19px;margin:0 0 12px}small,.muted{color:#acb8b8}.card{background:#21313a;border:1px solid #3a5057;border-radius:13px;padding:17px;margin:13px 0}.hidden{display:none!important}.row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:13px}.stat{text-align:center;background:#15242b;border-radius:8px;padding:9px 1px}.stat b{display:block;font-size:20px;color:#ebc98e}.stat small{font-size:12px}.pill{display:inline-block;border:1px solid #60716b;border-radius:40px;padding:4px 9px;font-size:12px;margin:6px 5px 0 0}.choice{display:block;width:100%;text-align:left;background:#324850;border:1px solid #6d7974;color:#f4eee1;border-radius:9px;padding:13px;margin:10px 0;line-height:1.65;font-size:15px;cursor:pointer}.choice:hover:not(:disabled){background:#435d63}.choice.choice-ending{background:#512a30;border-color:#ba6168;color:#ffe4e4}.choice.choice-ending:hover:not(:disabled){background:#69333c}.choice.choice-ending small{color:#e7b3b7}.choice:disabled{opacity:.42;cursor:not-allowed}.choice small{display:block;font-size:12px}.primary{background:#cba76c;color:#182026;border:0;border-radius:9px;padding:12px 16px;font-weight:700;font-size:15px;cursor:pointer}input{background:#101f25;color:white;border:1px solid #738181;border-radius:8px;padding:13px;width:100%;font-size:17px;margin:10px 0}.story{white-space:pre-line;line-height:1.9}.notice{color:#e5c88e}.nav{display:flex;gap:8px;flex-wrap:wrap}.nav button{background:#243740;color:#e6e6de;border:1px solid #657477;border-radius:7px;padding:9px;cursor:pointer}.entry{border-bottom:1px solid #45565a;padding:9px 0;line-height:1.65}.year{color:#dbb87c;font-size:13px}.sub{font-size:12px;color:#b5c2c2}.end{border-color:#b47b69}.milestone-backdrop{position:fixed;inset:0;background:rgba(3,10,14,.83);display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999}.milestone-panel{width:min(100%,490px);background:#243842;border:2px solid #d7b57c;border-radius:16px;padding:25px 21px;text-align:center;box-shadow:0 15px 60px #0009}.milestone-eyebrow{color:#d9b67a;font-size:13px;letter-spacing:.2em}.milestone-panel h2{font-size:26px;color:#f6d79b;margin:14px 0}.milestone-panel p{line-height:1.9;white-space:pre-line}.milestone-panel button{margin-top:12px;min-width:170px}</style></head><body><div class="wrap"><header><h1>戦国人生録</h1><small>試作版 9.0</small></header><div id="errorbox" class="card" style="display:none;color:#ffb7a9"></div><div id="start" class="card"><h2>一人の人生を、生きる。</h2><p class="story">時は1540年。生まれる土地も、家も、才能も選べない。<br>乱世の中で何を選び、どのように生きるか。</p><p class="sub">名字・名前はそれぞれ空欄の場合、ランダムに決まります。</p><label for="surname">名字<input id="surname" maxlength="12" autocomplete="off" placeholder="空欄ならランダム（例：山本）"></label><label for="name">名前<input id="name" maxlength="12" autocomplete="off" placeholder="空欄ならランダム（例：太郎）"></label><button id="begin" class="primary">人生を始める</button><p id="archives" class="sub"></p></div><main id="game" class="hidden"><div class="card"><div class="row"><strong id="who"></strong><span id="when" class="notice"></span></div><div id="position" class="sub"></div><div class="stats" id="stats"></div><div id="tags"></div></div><section id="scene" class="card"><div id="stage" class="sub"></div><h2 id="title"></h2><p id="narrative" class="story"></p><div id="options"></div><div id="result" class="hidden"><p id="outcome" class="story"></p><p id="deltas" class="notice"></p><button id="next" class="primary">次へ進む</button></div></section><div class="nav"><button id="profile">人物・家族</button><button id="diary">人生の日記</button><button id="restart">新しい人生</button></div><div id="detail" class="card hidden"></div></main></div><div id="milestone" class="milestone-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="milestone-title"><div class="milestone-panel"><div class="milestone-eyebrow">人生の転機</div><h2 id="milestone-title"></h2><p id="milestone-body"></p><button id="milestone-ok" class="primary">承知した</button></div></div><script>
+(()=>{'use strict';const $=id=>document.getElementById(id),R=(a,b)=>Math.floor(Math.random()*(b-a+1))+a,P=a=>a[R(0,a.length-1)],C=n=>Math.max(0,Math.min(100,Math.round(n))),KEY='sengoku-jinseiroku-proto-06',ARCH='sengoku-jinseiroku-archive-03';let s=null,e=null;
+// iOS Safari / file preview can deny Web Storage. Keep play functional without it.
+const memoryStore={};
+const safeStore={
+ getItem:function(k){try{return window.localStorage.getItem(k)}catch(err){return Object.prototype.hasOwnProperty.call(memoryStore,k)?memoryStore[k]:null}},
+ setItem:function(k,v){memoryStore[k]=String(v);try{window.localStorage.setItem(k,String(v))}catch(err){}},
+ removeItem:function(k){delete memoryStore[k];try{window.localStorage.removeItem(k)}catch(err){}}
+};
+window.addEventListener('error',function(ev){var box=document.getElementById('errorbox');if(box){box.style.display='block';box.textContent='動作エラー：'+(ev.message||'不明なエラー')+'。画面の内容をお知らせください。'}});
+const provinces=[['尾張','織田家'],['美濃','斎藤家'],['三河','松平家'],['甲斐','武田家'],['駿河','今川家'],['越後','長尾家'],['信濃','武田家'],['近江','六角家'],['備前','浦上家'],['安芸','毛利家'],['周防','大内家'],['肥前','龍造寺家'],['薩摩','島津家'],['播磨','赤松家'],['丹波','波多野家'],['土佐','長宗我部家'],['北近江','浅井家'],['越前','朝倉家'],['相模','北条家']];const surnames=['山本','小川','田村','岡田','藤井','村上','石川','中村','森田','河野','西村','大野','火野','小坂','岩田','高橋','井上','田中','吉田','松本','佐藤','木村','清水','橋本','後藤','陣内','飯島','栗田','鈴木','木島','辰巳','田野','喜多','西川','高山','岡','島','木下','村田','西','南','北岡'];const maleNames=['太郎','次郎','三郎','源兵衛','弥太郎','新助','彦七','宗兵衛','新九郎','又兵衛','与一','平八郎','弥三郎','小太郎','藤吉郎','源次郎','兵庫助','勘兵衛','左近','右近','喜八郎','与兵衛','庄三郎','彦兵衛','頼助','史郎','吾郎','孫七郎','十兵衛','太郎吉','太兵衛','大助','善介','一郎','半兵衛','喜助','源五郎','新次郎','勘助','権六','権左','藤次郎','悟郎左','小次郎','八兵衛','九郎','十四郎','幸一朗'];const femaleNames=['お春','お松','お藤','お千代','お市','お初','お菊','お梅','お竹','お雪','お鈴','お琴','お花','お妙','お玉','お芳','お絹','お糸','お汐','お光','お凛','お涼','お富','お千','お通'];// 初期家族は性別に応じた名簿から選び、主人公と家族内で名が重複しないようにする。
+function uniqueGivenName(candidates,used){const available=candidates.filter(name=>!used.has(name));const name=P(available.length?available:candidates);used.add(name);return name;}
+function startingFamilyNames(playerGivenName){
+ const used=new Set([playerGivenName]);
+ const parents=[uniqueGivenName(maleNames,used),uniqueGivenName(femaleNames,used)]; // 父、母
+ const siblings=Array.from({length:R(0,2)},()=>{const relation=P(['兄','姉','弟','妹']);return {name:uniqueGivenName(['兄','弟'].includes(relation)?maleNames:femaleNames,used),relation};});
+ return {parents,siblings};
+}
+const familyName=name=>String(name||'').trim().split(/[\s　]+/)[0];const st=['健康','武勇','知略','魅力','財産'];const seasons=['春','夏','秋','冬'];const seasonName=()=>'';const save=()=>{if(s)safeStore.setItem(KEY,JSON.stringify(s))};// 健康は日常の疲労では急減しない。大きな負傷だけを特別に扱う。
+const mod=(k,n)=>{if(k==='財産'&&n>0&&!s.clan&&['小商人','商家の当主','豪商','御用商人'].includes(s.rank))n*=1.2;if(k==='健康'&&n<0){n=-Math.max(1,Math.ceil(-n*.75))}if(['武勇','知略','魅力'].includes(k)&&n!==0){n=Math.sign(n)*Math.max(1,Math.round(Math.abs(n)*1.35))}s.stats[k]=C(s.stats[k]+n)};
+// 史実上の主家改姓。主人公自身の名字は変えず、主従関係・領国・調略履歴を引き継ぐ。
+const historicalRenames=[
+ {year:1561,from:'長尾家',to:'上杉家',title:'長尾家、上杉家の名跡を継ぐ',
+  body:'越後の長尾景虎は、関東管領・上杉憲政より上杉の名跡と関東管領職を譲り受け、「上杉政虎」と名乗った。\nこれより越後の主家は長尾家から上杉家となる。'},
+ {year:1566,from:'松平家',to:'徳川家',title:'松平家、徳川家へ改姓',
+  body:'三河を平定した松平家康は、朝廷より徳川への改姓を許され、「徳川家康」と名乗った。\nこれより三河の主家は松平家から徳川家となる。'}
+];
+const renamedClan=(clan,year)=>historicalRenames.reduce((v,h)=>year>=h.year&&v===h.from?h.to:v,clan);
+// 史実を元にした大名勢力の終焉。氏族全体の断絶とは区別する。
+// 年はゲーム上の確定年。勝敗を抽選して史実を覆すことはしない。
+const historicalFalls=[
+ {year:1557,clan:'大内家',type:'battle',title:'防長経略 ― 大内家の滅亡',battle:'防長経略・長門の最終攻防',enemy:'毛利元就',successor:'毛利家',
+  story:'1551年の大寧寺の変で大内義隆が自害した後、大内義長が家督を継いだ。しかし陶晴賢は1555年の厳島の戦いで毛利元就に敗れ、毛利軍は周防・長門へ進攻。1557年、義長は追い詰められて自害し、大内家の大名政権は滅亡した。'},
+ {year:1567,clan:'斎藤家',type:'battle',title:'稲葉山城の戦い ― 斎藤家の没落',battle:'稲葉山城の戦い',enemy:'織田信長',successor:'織田家',
+  story:'美濃の斎藤龍興は、織田信長の攻撃を受けて稲葉山城を失った。龍興は城を脱出し、斎藤家は美濃を治める戦国大名としての地位を失った。'},
+ {year:1568,clan:'六角家',type:'battle',title:'観音寺城の戦い ― 六角家の没落',battle:'観音寺城の戦い',enemy:'織田信長',successor:'織田家',
+  story:'足利義昭を奉じて上洛する織田信長の軍勢が近江へ進攻した。六角承禎・義治父子は観音寺城を放棄し、近江の支配を失った。六角一族はその後も抵抗を続けたが、戦国大名としての独立は失われた。'},
+ {year:1569,clan:'今川家',type:'battle',title:'掛川城の開城 ― 今川家の没落',battle:'掛川城の包囲戦',enemy:'徳川家康',successor:'徳川家',
+  story:'桶狭間で今川義元が討たれて以来、今川家は衰退した。武田信玄と徳川家康の侵攻を受け、今川氏真は掛川城に籠城。1569年、徳川方との和議によって開城し、今川家は戦国大名としての領国を失った。'},
+ {year:1575,clan:'浦上家',type:'battle',title:'天神山城の落城 ― 浦上家の没落',battle:'天神山城の戦い',enemy:'宇喜多直家',successor:'毛利家',
+  story:'備前の浦上宗景は、かつての家臣・宇喜多直家の離反によって追い詰められた。天神山城は1575年に落城したとする説が有力で、宗景は備前から退去。浦上家は備前の大名勢力としての地位を失った。'},
+ {year:1579,clan:'波多野家',type:'battle',title:'八上城の落城 ― 波多野家の滅亡',battle:'八上城の包囲戦',enemy:'明智光秀',successor:'織田家',
+  story:'丹波の波多野秀治らは、明智光秀による八上城の長期包囲を受けた。兵糧が尽きて開城に追い込まれ、秀治らは捕らえられて処刑された。波多野家は丹波の大名勢力として滅亡した。'},
+ {year:1582,clan:'武田家',type:'battle',title:'天目山の戦い ― 武田家の滅亡',battle:'天目山の戦い',enemy:'織田・徳川連合軍',successor:'徳川家',
+  story:'織田信長・徳川家康らの甲州征伐によって武田軍は崩壊した。武田勝頼は退却の末、天目山で追い詰められて自害し、甲斐武田家の戦国大名政権は滅亡した。'},
+ {year:1573,clan:'朝倉家',type:'battle',title:'一乗谷城の戦い ― 朝倉家の滅亡',battle:'一乗谷城の戦い',enemy:'織田信長',successor:'織田家',
+  story:'1573年、織田信長の軍勢が越前へ攻め込んだ。朝倉義景は一乗谷を離れて大野郡へ逃れたが、家臣の裏切りによって追い詰められ自害。越前朝倉家の大名政権は滅亡した。'},
+ {year:1573,clan:'浅井家',type:'battle',title:'小谷城の戦い ― 浅井家の滅亡',battle:'小谷城の戦い',enemy:'織田信長',successor:'織田家',
+  story:'1573年、織田軍は北近江の小谷城を攻めた。浅井長政は城を守り抜けず自害し、浅井家の大名政権は滅亡した。'},
+ {year:1585,clan:'長宗我部家',type:'battle',title:'四国攻め ― 長宗我部家の独立喪失',battle:'豊臣秀吉の四国攻め',enemy:'羽柴秀吉',successor:'豊臣家',
+  story:'1585年、羽柴秀吉の大軍が四国へ進攻。長宗我部元親は降伏し、土佐一国を安堵された。長宗我部家そのものは存続したが、四国に独立勢力を築いた戦国大名としての地位は失われた。'},
+ {year:1590,clan:'北条家',type:'battle',title:'小田原征伐 ― 後北条家の滅亡',battle:'小田原城の包囲戦',enemy:'豊臣秀吉',successor:'豊臣家',
+  story:'1590年、豊臣秀吉は全国の大名を動員して小田原城を包囲した。北条氏政・氏直は降伏し、氏政は切腹、氏直は高野山へ追放された。関東の後北条家は大名勢力として滅亡した。'},
+ {year:1615,clan:'豊臣家',type:'battle',title:'大坂夏の陣 ― 豊臣家の滅亡',battle:'大坂夏の陣',enemy:'徳川家康・秀忠',successor:'徳川家',
+  story:'1615年、大坂夏の陣で徳川軍が大坂城を攻め落とした。豊臣秀頼と淀殿は自害し、豊臣家の大名政権は滅亡した。'},
+ {year:1600,clan:'赤松家',type:'incident',title:'関ヶ原の戦後処分 ― 赤松宗家の終焉',battle:'関ヶ原の戦いと戦後処分',enemy:'関ヶ原の戦後処分',successor:'徳川家',
+  story:'関ヶ原の戦いの後、赤松宗家は所領と大名としての地位を失ったとされる。赤松則房・則英らの最期には諸説があり、一族全体が絶えたわけではない。ここでは大名家としての終焉を1600年に置く。'},
+ {year:1607,clan:'龍造寺家',type:'incident',title:'龍造寺宗家の断絶 ― 鍋島家の継承',battle:'龍造寺家の家督をめぐる政変',enemy:'鍋島家への継承',successor:'鍋島家',
+  story:'龍造寺高房が江戸で自害を図り、その傷がもとで死去した。父の龍造寺政家も同年に没し、龍造寺宗家の大名としての継承は途絶えた。肥前の支配は鍋島家へ移った。'}
+];
+// 全国の転機。通知は全員、合戦は当事者・指定勢力だけが体験する。
+const nationalHistory=[
+ {year:1560,id:'okehazama',title:'桶狭間の戦い',kind:'battle',clans:['織田家','今川家'],winner:'織田家',style:'野戦',body:'尾張に進軍した今川義元の軍勢を織田信長が急襲。義元は討ち取られ、今川家の勢威が揺らいだ。'},
+ {year:1568,id:'kyoto',title:'織田信長の上洛',kind:'news',body:'織田信長は足利義昭を奉じて京都へ進軍した。畿内の勢力図が大きく動き始めた。'},
+ {year:1570,id:'anegawa',title:'姉川の戦い',kind:'battle',clans:['織田家','徳川家','浅井家','朝倉家'],winner:'織田家',style:'野戦',body:'織田・徳川連合軍と浅井・朝倉連合軍が近江の姉川で激突した。織田・徳川方が勝利した。'},
+ {year:1573,id:'shogunate',title:'室町幕府の終焉',kind:'news',body:'織田信長によって足利義昭が京都から追放された。室町幕府は事実上終焉を迎えた。'},
+ {year:1575,id:'nagashino',title:'長篠の戦い',kind:'battle',clans:['織田家','徳川家','武田家'],winner:'徳川家',style:'野戦',body:'長篠・設楽原で織田・徳川連合軍と武田勝頼軍が激突し、武田軍は大敗した。'},
+ {year:1582,id:'honnoji',title:'本能寺の変',kind:'honnoji',body:'明智光秀が京都の本能寺にいた織田信長を急襲。信長は本能寺で自害した。'},
+ {year:1584,id:'komaki',title:'小牧・長久手の戦い',kind:'battle',clans:['徳川家','織田家'],winner:'徳川家',style:'野戦',body:'羽柴秀吉軍と徳川家康・織田信雄方が対立。長久手の局地戦では徳川方が勝利したが、織田信雄は秀吉と単独講和し、家康も兵を引いた。'},
+ {year:1585,id:'shikoku',title:'四国攻め',kind:'battle',clans:['長宗我部家','豊臣家'],winner:'豊臣家',style:'籠城戦',body:'羽柴秀吉が大軍を四国に派遣。長宗我部元親は降伏し、土佐一国を安堵された。'},
+ {year:1587,id:'kyushu',title:'九州平定',kind:'battle',clans:['島津家','豊臣家'],winner:'豊臣家',style:'野戦',body:'豊臣秀吉が九州へ大軍を進め、島津義久は降伏した。島津家は所領の一部を安堵された。'},
+ {year:1590,id:'odawara',title:'小田原征伐',kind:'battle',clans:['北条家','豊臣家','上杉家'],winner:'豊臣家',style:'籠城戦',body:'豊臣秀吉が諸大名を動員して小田原城を包囲。後北条家は降伏し、関東の支配を失った。'},
+ {year:1592,id:'bunroku',title:'文禄の役',kind:'overseas',body:'豊臣秀吉の命により朝鮮への出兵が始まった。海を渡る軍勢と、兵糧・物資を支える人々が動員された。'},
+ {year:1597,id:'keicho',title:'慶長の役',kind:'overseas',body:'豊臣政権による朝鮮への再出兵が始まった。渡海と戦闘には大きな危険が伴う。'},
+ {year:1598,id:'hideyoshi',title:'豊臣秀吉の死',kind:'news',body:'天下人・豊臣秀吉が死去した。幼い秀頼を残し、豊臣政権の行く末に不安が広がった。'},
+ {year:1600,id:'sekigahara',title:'関ヶ原の戦い',kind:'sekigahara',body:'徳川家康率いる東軍と石田三成らの西軍が美濃・関ヶ原で激突。東軍が勝利した。'},
+ {year:1603,id:'edo',title:'江戸幕府の成立',kind:'news',body:'徳川家康が征夷大将軍に任じられ、江戸幕府を開いた。'},
+ {year:1614,id:'osaka_winter',title:'大坂冬の陣',kind:'osaka',body:'徳川方の大軍が大坂城を包囲した。豊臣方は城に籠り、激しい攻防が続いた。'},
+ {year:1615,id:'osaka_summer',title:'大坂夏の陣',kind:'osaka',body:'徳川軍と豊臣軍が再び激突。大坂城は落城し、豊臣家は滅亡した。'}
+];
+const birthYear=()=>s&&Number.isInteger(s.birthYear)?s.birthYear:1530;
+// 大名家の攻め手。史実の結末は戦闘結果が出るまで伏せる。
+const fallAttackers={
+ '大内家':['毛利家'],'斎藤家':['織田家'],
+ '六角家':['織田家'],'今川家':['徳川家'],'浦上家':[],
+ '波多野家':['織田家'],'武田家':['織田家','徳川家'],
+ '朝倉家':['織田家'],'浅井家':['織田家'],
+ '長宗我部家':['豊臣家'],'北条家':['豊臣家','上杉家'],
+ '豊臣家':['徳川家']
+};
+const attackHistoryCovered=(h)=>['長宗我部家','北条家','豊臣家'].includes(h.clan);
+const fallHistoryBattle=(h)=>h.clan==='長宗我部家'?'shikoku':h.clan==='北条家'?'odawara':h.clan==='豊臣家'?'osaka_summer':null;
+function announceHistoricalFall(h){
+ if(!s.historicalFallAnnounced||typeof s.historicalFallAnnounced!=='object')s.historicalFallAnnounced={};
+ if(s.historicalFallAnnounced[h.clan])return;
+ s.historicalFallAnnounced[h.clan]=true;
+ queueMilestone('天下の転機 ― '+h.title,h.year+'年。\n'+h.story+'\n\n'+h.clan+'は独立した大名勢力としての地位を失った。');
+ note('諸国に'+h.title+'の結末が伝わった。');
+}
+
+const pendingAttackFall=()=>{
+ if(!s||!Array.isArray(s.pendingAttackFalls))return null;
+ const year=birthYear()+s.age;
+ s.pendingAttackFalls=s.pendingAttackFalls.filter(clan=>historicalFalls.some(h=>h.clan===clan&&h.year===year));
+ return historicalFalls.find(h=>s.pendingAttackFalls.includes(h.clan))||null;
+};
+const attackingForeboding=[
+ 'この一戦に勝てば、天下の情勢は大きく変わるだろう。',
+ '敵は名の知れた強敵。しかし、味方の士気はかつてないほど高い。',
+ 'この戦いの勝敗が、幾多の武将の運命を左右するかもしれない。',
+ 'これほどの大軍が動く戦は珍しい。後世に名を残す好機かもしれない。',
+ '戦場を見渡したあなたは、新しい時代の幕開けを予感した。',
+ '長く続いた争いが、この戦を境に動き出すかもしれない。'
+];
+function historicalAttackScene(h){
+ const battle=h.battle||'領国をめぐる戦い';
+ const attackers={
+  '大内家':'毛利軍は周防・長門へ進軍した。大内方の抵抗が続き、戦況は予断を許さない。',
+  '斎藤家':'織田軍が稲葉山城に迫る。堅城を前に、諸将は攻め方を議論している。',
+  '六角家':'織田軍は近江へ進軍した。六角勢の動向を探りながら進路を定めている。',
+  '今川家':'徳川軍は掛川城を包囲した。今川方の抵抗と和議の噂が交錯している。',
+  '波多野家':'明智光秀の軍勢が八上城を包囲する。城内の動きはつかめず、長い攻防が続いている。',
+  '武田家':'織田・徳川の連合軍が甲斐へ進軍する。武田軍も各地で迎撃の構えを見せている。',
+  '朝倉家':'織田軍が越前へ進軍した。朝倉勢は守りを固め、各地で戦の気配が高まる。',
+  '浅井家':'織田軍は小谷城へ迫った。浅井勢も守備を固め、山城をめぐる戦いが始まろうとしている。'
+ };
+ const intro='【攻城・進軍】'+battle+'\n'+(attackers[h.clan]||h.clan+'との戦が迫り、諸将は攻め方を評議している。')+'\n\nあなたは'+s.clan+'の'+s.rank+'として、この戦に加わっている。\n'+P(attackingForeboding)+'\nあなたはどう行動するか。';
+ const fight=(action)=>()=>{
+  s.pendingAttackFalls=(s.pendingAttackFalls||[]).filter(c=>c!==h.clan);
+  const stat=action==='charge'?'武勇':action==='strategy'?'知略':'魅力';
+  const chance=Math.max(12,Math.min(92,35+Math.floor((s.stats[stat]||0)*.55)));
+  const success=R(1,100)<=chance;
+  const danger=action==='charge'?12:action==='strategy'?7:3;
+  if(risk(danger+(s.age>=70?6:0)+(s.stats.健康<30?5:0),battle+'で討死した。')){announceHistoricalFall(h);return '【討死】'+battle+'の戦場で命を落とした。\n【史実の結末】'+h.story;}
+  if(success){s.merit=(s.merit||0)+(action==='rescue'?1:2);s.trust=(s.trust||0)+2;mod(stat,R(1,3));}
+  else {mod('健康',-R(2,7));if(action==='charge')mod('財産',-R(1,3));}
+  announceHistoricalFall(h);
+  const actionText=action==='charge'?'前線で槍を振るい':action==='strategy'?'敵の動きを読み、味方を導き':'負傷者を助け、味方の退路を守り';
+  return (success?'【成功】':'【苦戦】')+actionText+(success?'、任務を果たした。':'、傷を負いながら戦場を離れた。')+'\n\n【戦の結末】'+h.story;
+ };
+ return scene(battle,intro,[
+  opt('先陣に立って攻める','武勇／討死の危険・武功',fight('charge')),
+  opt('戦況を読み、部隊を指揮する','知略／討死の危険・武功',fight('strategy')),
+  opt('負傷者と味方の退路を守る','魅力／危険は比較的低い',fight('rescue'))
+ ]);
+}
+const nationalEventSeen=()=>{if(!s.nationalEventSeen||typeof s.nationalEventSeen!=='object')s.nationalEventSeen={};return s.nationalEventSeen};
+function prepareNationalHistory(){
+ const year=birthYear()+s.age,seen=nationalEventSeen();
+ for(const h of nationalHistory){
+  if(h.year!==year||seen[h.id])continue;
+  if(h.kind==='news'||(h.kind==='honnoji'&&!(militaryAllegiance()==='織田家'&&['家臣','重臣','大名'].includes(s.rank)))){
+   seen[h.id]=true;queueMilestone('天下の動き ― '+h.title,year+'年。\n'+h.body);note(h.title+'の知らせが各地に届いた。');
+  }else if(h.kind==='battle'&&!h.clans.includes(militaryAllegiance())){
+   seen[h.id]=true;queueMilestone('戦国の大戦 ― '+h.title,year+'年。\n'+h.body);note(h.title+'の戦況が伝わった。');
+  }
+ }
+}
+function nextNationalHistory(){
+ const year=birthYear()+s.age,seen=nationalEventSeen();
+ return nationalHistory.find(h=>h.year===year&&!seen[h.id])||null;
+}
+
+// 関ヶ原：大名家の史実上の陣営を基本とし、架空の主人公の手勢だけは離反できる。
+// 関ヶ原：既存五家の家臣は、西軍の主家を離れて徳川家へ移れる。
+function sekigaharaDefaultSide(){
+ const west=['毛利家','島津家','上杉家','豊臣家','長宗我部家'];
+ return west.includes(militaryAllegiance())?'西軍':'東軍';
+}
+function sekigaharaScene(h,prefix){
+ const originalClan=militaryAllegiance();
+ const vassalDaimyo=s.rank==='大名'&&!s.independent&&!!s.overlord;
+ const freeDaimyo=s.rank==='大名'&&s.independent;
+ const defaultSide=sekigaharaDefaultSide(),otherSide=defaultSide==='東軍'?'西軍':'東軍';
+ const canJoinTokugawa=['毛利家','島津家','上杉家','豊臣家','長宗我部家'].includes(originalClan)
+   &&!!originalClan&&s.rank!=='大名'&&s.rank!=='浪人';
+ const son=heirForSuccession(),hasSon=!!(son&&son.alive!==false);
+ const inherited=!!(s.successionMode&&hasSon),regent=s.successionMode==='regent';
+ const campName=side=>side==='東軍'?'徳川家康の東軍':'石田三成らの西軍';
+ const record=(side,defected)=>{
+  s.sekigaharaSide=side;
+  if(side==='西軍'&&s.age>=55&&['家臣','重臣','家中筆頭','大名'].includes(s.rank))s.oldWarriorOath=true;
+  if(defected)note('関ヶ原で主家の'+defaultSide+'とは異なる'+side+'に、自らの手勢を率いて加わった。');
+  else note('関ヶ原では'+side+'として戦った。');
+ };
+ const transferToTokugawa=()=>{
+  if(!canJoinTokugawa||s.clan!=='徳川家'&&s.clan!==originalClan)return '';
+  if(s.clan==='徳川家')return '';
+  const old=s.clan;
+  s.previousService={clan:old,rank:s.rank,year:birthYear()+s.age,reason:'関ヶ原で東軍に離反'};
+  s.clan='徳川家';
+  s.local='徳川家';
+  s.trust=2;
+  if(s.housePower&&s.housePower.clan===old)s.housePower=null;
+  if(!Array.isArray(s.achievements))s.achievements=[];
+  s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'離反・仕官',summary:old+'から離反し、関ヶ原で徳川家に仕えた'});
+  note('関ヶ原で'+old+'を離れ、手勢とともに徳川家の家臣となった。');
+  return '【主家離反】'+old+'を離れ、あなたの家は徳川家の家臣となった。以後は徳川家に仕える。\n';
+ };
+ const sonFight=(side,defected)=>{
+  const transferred=side==='東軍'&&canJoinTokugawa?transferToTokugawa():'';
+  record(side,defected);
+  const pre=defected?'主家の軍勢とは袂を分かち、'+campName(side)+'へ手勢を率いて加わった。\n':'';
+  if(R(1,100)<=5){
+   son.alive=false;s.heirSon=son;note(son.name+'が関ヶ原の戦いで討死した。');
+   return transferred+pre+'【悲報】'+son.name+'は関ヶ原の戦場で討死した。\n【史実の結末】'+h.body;
+  }
+  return transferred+pre+son.name+'は'+campName(side)+'として戦い、帰還した。'+(side==='西軍'?'西軍の敗戦を受け、戦後の処遇には不安が残る。':'東軍の勝利を受け、家中は安堵した。')+'\n【史実の結末】'+h.body;
+ };
+ const protagonistFight=(side,defected)=>{
+  const transferred=side==='東軍'&&canJoinTokugawa?transferToTokugawa():'';
+  record(side,defected);
+  const out=historicalCombat(h,side,'strategy','野戦');
+  return transferred+(defected?'主家の陣営に背き、自らの手勢を率いて'+campName(side)+'に加わった。\n':'')+out;
+ };
+ const intro=prefix+(freeDaimyo?'あなたは独立大名として自らの軍勢を率いる。東軍と西軍、どちらに加わるかはあなたの決断に委ねられている。':vassalDaimyo?'あなたの従属先である'+originalClan+'は'+defaultSide+'の陣営にある。主従関係に従い、その陣営で戦う。':'あなたの仕える'+(originalClan||'勢力')+'は'+defaultSide+'の陣営にある。')+
+  (canJoinTokugawa?'ただし、主家に背き、自分たちだけで徳川家に仕える道もある。':vassalDaimyo?'主君の軍勢と行動をともにする。':freeDaimyo?'どちらの陣営に加わるかは自由である。':'自らの手勢の進退を決めることになる。')+
+  (inherited?'\n家督を継いだ'+son.name+'が判断を迫られている。'+(regent?'実権を握るあなたは息子に命令できる。':'完全隠居したあなたは助言できるが、最終的には息子が決める。'):vassalDaimyo?'\nあなた自身が主家の陣営で出陣する。':'\nあなた自身が出陣する陣営を決める。')+'\n\nあなたはどうするか。';
+ const make=(side,defected)=>{
+  const switchLord=side==='東軍'&&canJoinTokugawa;
+  const label=(inherited?(regent?'息子に命じて':'息子に勧めて'):'自ら')+(switchLord?'主家を離れ徳川家に仕える':side+'につく');
+  const desc=(switchLord?'徳川家へ仕官先変更／':defected?'主家の方針に背く／':'')+(inherited?'息子に討死の危険':'自分に討死の危険');
+  return opt(label,desc,()=>{
+   if(!inherited)return protagonistFight(side,defected);
+   if(regent)return 'あなたの命を受け、'+sonFight(side,defected);
+   // 完全隠居では助言に強制力はなく、拒まれれば元の主家に留まる。
+   const chosen=R(1,100)<=70?side:defaultSide;
+   return chosen===side?'息子はあなたの助言を受け入れた。\n'+sonFight(chosen,chosen!==defaultSide):
+     '息子は助言を聞いたが、自らの考えで'+chosen+'につくと決めた。\n'+sonFight(chosen,false);
+  });
+ };
+ const options=vassalDaimyo?[make(defaultSide,false)]:freeDaimyo?[make('東軍',false),make('西軍',false)]:[make(defaultSide,false),make(otherSide,true)];
+ if(inherited){
+  options.push(opt(regent?'息子の判断に任せる':'助言せず息子に任せる','息子が出陣する／討死の危険',()=>{
+   return '息子は'+defaultSide+'につくと決めた。\n'+sonFight(defaultSide,false);
+  }));
+ }else if(!vassalDaimyo){
+  options.push(opt('どちらにも加わらず戦を避ける','出陣しない／信頼に影響',()=>{
+   s.sekigaharaSide='中立';s.trust=Math.max(0,(s.trust||0)-R(2,5));
+   return 'あなたは自らの手勢を戦場へ送らず、情勢を見守った。\n【史実の結末】'+h.body;
+  }));
+ }
+ return scene('関ヶ原の戦い ― 東軍と西軍',intro,options);
+}
+// 関ヶ原で西軍を選んだ老将だけの、冬・夏の陣に続く隠しルート。
+function oldWarriorOsakaScene(h,prefix){
+ const winter=h.id==='osaka_winter';
+ const son=heirForSuccession(),hasSon=!!(son&&son.alive!==false);
+ const retired=!!s.successionMode,regent=s.successionMode==='regent';
+ const battleType=winter?'籠城戦':'野戦';
+ const opening=winter?
+  '十四年前、関ヶ原であなたは西軍を選び、敗れた。時は流れ、豊臣家の命運を懸けて大坂城が包囲されようとしている。':
+  '冬の陣を越え、再び大坂に戦雲が立ち込める。関ヶ原の敗戦から十五年。老いたあなたのもとへ、かつて槍を並べた家臣たちが集まってきた。';
+ const go=()=>{
+  s.osakaToyotomiVolunteer=true;
+  s.oldWarriorFinalCharge=!winter;
+  note((winter?'大坂冬の陣':'大坂夏の陣')+'で老臣たちを率いて豊臣方に加わった。');
+  const intro=winter?
+   'あなたは古びた甲冑を身につけ、昔からの家臣を呼び集めた。白髪の老兵たちは、再びあなたの旗の下に集う。大坂城に入り、豊臣方として徳川の大軍を迎え撃った。':
+   'あなたは自ら甲冑をまとい、昔から付き従った老臣たちの前に立った。誰もが年老い、かつてのようには動けぬ。それでも誰一人として去ろうとはしなかった。\n「これが我らの最後の戦だ。徳川勢に一矢報いるぞ」\n老兵たちは声を上げ、あなたとともに徳川の軍勢へ突き進んだ。';
+  // 史実の豊臣敗北は覆らない。夏の陣の突撃は極めて危険だが、生還もあり得る。
+  const deathRisk=winter?12:52;
+  if(risk(deathRisk,h.title+'で、老臣たちとともに徳川軍に突撃して討死した。')){
+   note('老将、最後の出陣。徳川軍を相手に討死した。');
+   return intro+'\n\n【老将の最期】徳川勢の猛攻の中、あなたは最後まで槍を離さなかった。かつての家臣たちも、その傍らで戦い続けた。\n【史実の結末】'+h.body;
+  }
+  mod('健康',-R(winter?4:12,winter?11:24));
+  if(winter){s.oldWarriorWinterSurvived=true;return intro+'\n\n【生還】激しい攻防の末、あなたと老臣たちは大坂城へ戻った。まだ戦は終わっていない。\n【史実の結末】'+h.body;}
+  s.oldWarriorFinalSurvived=true;
+  return intro+'\n\n【生還】徳川勢に押し返され、仲間を失いながらも、あなたは戦場を生き延びた。だが豊臣家の敗北は覆らなかった。\n【史実の結末】'+h.body;
+ };
+ const leave=()=>{
+  s.oldWarriorOsakaAbstained=true;
+  return 'あなたは古い甲冑を見つめたが、再び戦場へ向かうことはなかった。老臣たちとともに、戦の行方を見守った。\n【史実の結末】'+h.body;
+ };
+ const choices=[
+  opt('自ら甲冑をまとい、老臣たちと豊臣方へ出陣する',winter?'老兵を率いて大坂城へ／討死の危険':'徳川軍へ最後の突撃／討死の危険が非常に高い',go),
+  opt('出陣せず、戦の行方を見守る','本人は戦場へ向かわない',leave)
+ ];
+ if(retired&&hasSon){
+  choices.push(opt(regent?'息子に豊臣方への出陣を命じる':'息子に豊臣方への出陣を勧める',regent?'息子に命令／討死の危険':'助言／息子が従うとは限らない',()=>{
+   if(!regent&&R(1,100)>70)return son.name+'はあなたの助言を聞いたが、出陣を見送った。';
+   if(R(1,100)<=(winter?5:12)){son.alive=false;s.heirSon=son;note(son.name+'が大坂の陣で討死した。');return '息子の'+son.name+'は豊臣方として出陣したが、戦場で討死した。\n【史実の結末】'+h.body;}
+   return son.name+'は豊臣方として出陣し、生還した。\n【史実の結末】'+h.body;
+  }));
+ }
+ return scene(h.title+' ― 老将、最後の戦',prefix+opening+'\n'+(retired?'家督はすでに息子に譲った。だが、この戦にどう向き合うかはあなた自身にも選べる。':'あなたは自らの進退を決められる。')+'\n\nあなたはどうするか。',choices);
+}
+function nationalHistoryScene(h){
+ const historicalWar=['battle','sekigahara','osaka'].includes(h.kind);
+ const prewar={
+  'okehazama':'今川軍が尾張へ進軍し、織田方は迎撃の準備を進めている。',
+  'anegawa':'近江の姉川で織田・徳川勢と浅井・朝倉勢が対峙した。',
+  'nagashino':'長篠・設楽原に両軍が集まり、鉄砲隊と騎馬隊の動向が注目されている。',
+  'komaki':'羽柴秀吉と徳川家康・織田信雄の両勢力が尾張周辺で対峙している。',
+  'shikoku':'羽柴秀吉が四国へ大軍を派遣した。長宗我部勢は各地の守りを固めている。',
+  'kyushu':'豊臣軍が九州へ進軍し、島津勢との戦いが迫っている。',
+  'odawara':'豊臣秀吉が諸大名を動員し、小田原へ進軍した。北条方は城の守りを固めている。',
+  'sekigahara':'徳川家康率いる東軍と石田三成らの西軍が、美濃・関ヶ原に集結しつつある。',
+  'osaka_winter':'徳川方の大軍が大坂城を囲み、豊臣方も城を守る構えを見せている。',
+  'osaka_summer':'大坂をめぐって再び両軍が動き出した。諸将の緊張が高まっている。'
+ };
+ const prefix='【'+h.year+'年・史実イベント】\n'+(historicalWar?(prewar[h.id]||'大軍が動き、戦の気配が高まっている。'):h.body)+'\n\n';
+ if(h.kind==='sekigahara')return sekigaharaScene(h,prefix);
+ if(h.kind==='honnoji')return scene('本能寺の変 ― 信長に供奉するか',prefix+'織田信長は毛利攻めを進める羽柴秀吉への援軍に向け、京都・本能寺に宿泊することになった。\n織田家に仕えるあなたにも、信長の供に加わる機会が巡ってきた。',[
+  opt('信長公に供奉し、本能寺へ向かう','本能寺で襲撃を体験／討死の危険',()=>{
+   s.honnojiAttended=true;s.pendingHonnojiAttack=true;
+   return '信長の一行とともに本能寺に入った。夜明け前、寺の周囲に不穏な気配が迫る。';
+  }),
+  opt('京には向かわず、持ち場に留まる','襲撃を直接体験しない',()=>{s.honnojiAttended=false;return '京から急報が届いた。明智光秀の謀反により信長が討たれ、織田家中は大混乱に陥った。';})]);
+ if(h.kind==='osaka'&&s.oldWarriorOath&&!s.oldWarriorOsakaAbstained)return oldWarriorOsakaScene(h,prefix);
+ if(h.kind==='overseas'&&s.successionMode)return overseasSuccessionScene(h,prefix);
+ if(h.kind==='overseas')return scene(h.title+' ― 海を渡る戦',prefix+'軍勢は朝鮮へ渡る準備を進めている。出航した船には嵐や遭難の危険もある。',[
+  opt('軍勢とともに渡海し、出兵する','水難事故による死亡の危険／武功の機会',()=>{
+   if(risk(5,'朝鮮出兵の渡海中、船の遭難により命を落とした。'))return '船団が荒天に遭い、乗っていた船が沈没した。';
+   mod('健康',-R(3,8));if(s.clan){s.merit=(s.merit||0)+R(1,3);s.trust=(s.trust||0)+1;}else mod('財産',R(1,4));
+   return '荒波を越えて朝鮮へ渡り、戦場と補給の苦難を経験した。';
+  }),
+  opt('兵糧や武具の輸送を支える','知略・財産に影響／渡海しない',()=>{mod('知略',R(1,3));mod('財産',s.rank==='百姓'?-R(2,5):R(1,3));return '国内の兵站を支え、長期の遠征が人々の暮らしにも及ぶことを知った。';}),
+  opt('家族と領地を守るため国内に残る','健康を優先／財産－',()=>{mod('財産',-R(1,3));return '遠征の知らせを聞きながら、国内で家族と暮らしを守った。';})]);
+ let side='';
+ if(h.kind==='sekigahara'){
+  const west=['毛利家','島津家','上杉家','豊臣家','赤松家','宇喜多家','長宗我部家'];
+  const east=['徳川家','井伊家','本多家','黒田家','鍋島家'];
+  side=west.includes(s.clan)?'西軍':east.includes(s.clan)?'東軍':'未定';
+ }else if(h.kind==='osaka')side=(s.rank==='浪人'||militaryAllegiance()==='豊臣家')?'豊臣方':'徳川方';
+ else side=h.winner&&(militaryAllegiance()===h.winner||(h.id==='anegawa'&&militaryAllegiance()==='徳川家')||(h.id==='nagashino'&&militaryAllegiance()==='織田家')||(h.id==='komaki'&&militaryAllegiance()==='織田家')||(h.id==='odawara'&&militaryAllegiance()==='上杉家')||(h.id==='shikoku'&&militaryAllegiance()==='豊臣家'))?'勝利側':'敗北側';
+ const battleType=h.kind==='osaka'?(side==='豊臣方'?'籠城戦':'攻城戦'):h.id==='odawara'?(militaryAllegiance()==='北条家'?'籠城戦':'攻城戦'):h.id==='shikoku'?(militaryAllegiance()==='長宗我部家'?'籠城戦':'攻城戦'):h.style||'野戦';
+ const position=side==='未定'?'あなたは主を持たぬ身。どちらに加勢するかを選べる。':
+  side==='勝利側'||side==='敗北側'?'あなたは'+(s.clan||'味方')+'の一員として戦場に立っている。':
+  'あなたの立場：'+(side||'参戦')+'。';
+ const foreboding=historicalWar?P((side==='勝利側'||side==='徳川方'||side==='東軍')?attackingForeboding:[
+  'これまでの戦とは何かが違う。あなたは胸騒ぎを覚えた。',
+  'この一戦を境に、国のありようが大きく変わるかもしれない。',
+  '戦場に漂う重苦しい空気が、ただならぬ戦の始まりを告げている。',
+  'この戦いは、後の世まで語り継がれる大戦となるかもしれない。'
+ ]):'';
+ const intro=prefix+'【'+battleType+'】\n'+position+'\n'+foreboding+'\nあなたはどう行動するか。';
+ const chooseSide=(choice,action)=>()=>{let camp=side==='未定'?choice:side;return historicalCombat(h,camp,action,battleType)};
+ if(side==='未定'&&h.kind==='sekigahara')return scene('関ヶ原の戦い ― 東軍か西軍か',intro,[
+  opt('東軍に加わり、戦う','野戦・討死の危険',chooseSide('東軍','charge')),
+  opt('西軍に加わり、戦う','野戦・討死の危険',chooseSide('西軍','charge')),
+  opt('戦場の負傷者を助ける','危険を抑え、人々を救う',chooseSide('中立','rescue'))]);
+ return scene(h.title+' ― '+battleType,intro,[
+  opt('先陣に立って戦う','武勇／討死の危険・武功',chooseSide(side,'charge')),
+  opt('戦況を読み、部隊を指揮する','知略／討死の危険・武功',chooseSide(side,'strategy')),
+  opt('負傷者と味方の退路を守る','魅力／危険は比較的低い',chooseSide(side,'rescue'))]);
+}
+// 足軽・足軽大将の極めて稀な大手柄。討ち取るのは架空の敵将であり、史実の勝敗は変えない。
+function exceptionalHeadFeat(){
+ if(!s.clan||!['足軽','足軽大将'].includes(s.rank))return '';
+ const rate=Math.min(12,3+Math.floor((s.stats.武勇||0)/25)+(s.rank==='足軽大将'?2:0));
+ if(R(1,100)>rate)return '';
+ const oldRank=s.rank;
+ s.rank='家臣';
+ s.merit=(s.merit||0)+8;
+ s.trust=(s.trust||0)+12;
+ mod('魅力',R(2,5));
+ mod('財産',R(4,9));
+ note('合戦で敵方の有力な部隊長を討ち取り、大将首の大手柄により'+oldRank+'から家臣へ一挙に取り立てられた。');
+ return '【大将首の大手柄】敵方の有力な部隊長を討ち取った！主君は異例の武功を賞し、あなたを'+oldRank+'から一挙に家臣へ取り立てた。';
+}
+function historicalCombat(h,side,action,battleType){
+ const relatedFall=historicalFalls.find(f=>f.year===h.year&&fallHistoryBattle(f)===h.id);
+ // The defending house has its own defeat scene and milestone. Other participants learn the outcome after choosing.
+ const notifyAfterCombat=()=>{if(relatedFall&&s.clan!==relatedFall.clan)announceHistoricalFall(relatedFall)};
+ const winner=h.kind==='sekigahara'?'東軍':h.kind==='osaka'?'徳川方':h.winner;
+ const friendlyWin=side===winner||side==='勝利側'||(h.kind==='osaka'&&side==='徳川方');
+ const stat=action==='charge'?'武勇':action==='strategy'?'知略':'魅力';
+ const chance=Math.max(12,Math.min(92,35+Math.floor((s.stats[stat]||0)*.55)));
+ const success=R(1,100)<=chance;
+ const danger=(action==='charge'?12:action==='strategy'?7:3)+(friendlyWin?0:5)+(s.age>=70?6:0)+(s.stats.健康<30?5:0);
+ if(risk(danger,h.title+'で討死した。')){notifyAfterCombat();return '【討死】'+h.title+'の戦場で敵の攻撃を受け、命を落とした。\n【史実の結末】'+h.body;}
+ let greatFeat='';if(success){if(s.clan){s.merit=(s.merit||0)+(action==='rescue'?1:2);s.trust=(s.trust||0)+2;}mod(stat,R(1,3));if(action==='charge')greatFeat=exceptionalHeadFeat();}
+ else{mod('健康',-R(2,7));if(action==='charge')mod('財産',-R(1,3));}
+ const actionText=action==='charge'?'前線で槍を振るい':action==='strategy'?'敵の動きを読み、味方を導き':'混乱する兵と負傷者を助け';
+ notifyAfterCombat();
+ const end='【史実の結末】'+h.body;
+ return (success?'【成功】':'【苦戦】')+actionText+(success?'、任務を果たした。':'、傷を負いながら戦場を離れた。')+'\n'+(friendlyWin?(h.id==='komaki'?'長久手では徳川方が勝利したが、戦役は講和に向かった。':'味方は勝利した。'):side==='中立'?'両軍の戦いを見届けた。':'味方は敗れ、退却を余儀なくされた。')+'\n'+(greatFeat?greatFeat+'\n':'')+end;
+}
+const fallenHouse=(clan,year)=>historicalFalls.some(h=>h.clan===clan&&year>=h.year);
+const historicalSuccessor=(clan,year)=>{
+ let current=renamedClan(clan,year);
+ for(let i=0;i<12;i++){
+  const h=historicalFalls.find(x=>x.clan===current&&year>=x.year);
+  if(!h)break;
+  current=h.successor;
+ }
+ return current;
+};
+// Ver.6.3: 過去の最高役職と、謀反失敗による仕官禁止の履歴を保持する。
+const militaryRankOrder=['足軽','足軽大将','家臣','重臣','家中筆頭','大名'];
+function rememberHighestRank(rank){
+ if(!s)return;
+ const current=militaryRankOrder.indexOf(rank);
+ if(current<0)return;
+ if(current>militaryRankOrder.indexOf(s.highestMilitaryRank||''))s.highestMilitaryRank=rank;
+}
+function markFailedRebellion(clan,reason,rank){
+ if(!clan)return;
+ rememberHighestRank(rank);
+ if(!Array.isArray(s.failedRebellions))s.failedRebellions=[];
+ const year=birthYear()+s.age;
+ s.failedRebellions.push({clan,year,reason,rank:rank||s.highestMilitaryRank||'足軽'});
+ if(!Array.isArray(s.achievements))s.achievements=[];
+ s.achievements.push({age:s.age,year,kind:'謀反失敗',summary:clan+'への'+reason+'に失敗し、主家を追われた'});
+ note(clan+'への'+reason+'に失敗。以後、この主家への再仕官は認められない。');
+}
+function isBannedService(clan){
+ const year=birthYear()+s.age;
+ const target=renamedClan(clan,year);
+ return (s.failedRebellions||[]).some(x=>renamedClan(x.clan,year)===target&&!fallenHouse(target,year));
+}
+function availableServiceClans(){
+ return [...new Set(activeProvinces().map(x=>x[1]))].filter(clan=>!isBannedService(clan));
+}
+function rankForReemployment(){
+ const former=s.highestMilitaryRank||(s.previousService&&s.previousService.rank)||'足軽';
+ const order=militaryRankOrder.indexOf(former);
+ const notorious=(s.failedRebellions||[]).length>0;
+ if(order<=0)return '足軽';
+ if(order===1)return R(1,100)<=(notorious?30:65)?'足軽大将':'足軽';
+ if(order===2)return R(1,100)<=(notorious?25:65)?'家臣':'足軽大将';
+ // 元重臣・家中筆頭も、他家では一段低い役目からの再起が多い。
+ return R(1,100)<=(notorious?20:45)?'重臣':'家臣';
+}
+// 史実上消えた勢力へ再仕官・寝返りできないようにする。
+const activeProvinces=()=>{
+ const year=birthYear()+s.age;
+ const result=provinces.map(([region,clan])=>[region,historicalSuccessor(clan,year)])
+  .filter(x=>year>=1586||x[1]!=='豊臣家');
+ if(year>=1586)result.push(['摂津・大坂','豊臣家']);
+ return result;
+};
+// 豊臣姓の成立は1586年。出生時の大名家一覧には含めず、後年に登場させる。
+function applyToyotomiEmergence(showNews){
+ if(!s||birthYear()+s.age<1586||s.toyotomiEmergenceSeen)return;
+ s.toyotomiEmergenceSeen=true;
+ if(showNews&&birthYear()+s.age===1586){
+  queueMilestone('豊臣家の登場 ― 天下統一へ','1586年、関白・羽柴秀吉は朝廷から豊臣の姓を賜った。\n豊臣秀吉の政権は諸大名を従え、天下統一に向けて勢力を広げていく。\n以後、豊臣家が新たな仕官先・調略先として登場する。');
+  note('羽柴秀吉が豊臣姓を賜り、豊臣家が天下人の家として登場した。');
+ }
+}
+
+function applyHistoricalFalls(showNews){
+ if(!s)return;
+ const year=birthYear()+s.age;
+ if(!s.historicalFallsSeen||typeof s.historicalFallsSeen!=='object')s.historicalFallsSeen={};
+ for(const h of historicalFalls){
+  if(year<h.year||s.historicalFallsSeen[h.clan])continue;
+  // 赤松家の戦後処分は、同年の関ヶ原の戦いが終わってから発生させる。
+  if(h.clan==='赤松家'&&year===1600&&!nationalEventSeen().sekigahara)continue;
+  s.historicalFallsSeen[h.clan]=true;
+  if(s.rank==='大名'&&!s.independent&&s.overlord===h.clan){
+   s.independent=true;s.overlord=null;s.trust=0;
+   note(h.clan+'が滅亡したため、主従関係が解消され、独立大名となった。');
+   if(showNews)queueMilestone('主家滅亡 ― 独立大名へ',h.clan+'が大名家としての地位を失った。あなたは自領と家臣を保ち、独立大名として歩むこととなった。');
+  }
+  const attacker=showNews&&year===h.year&&h.type==='battle'&&!attackHistoryCovered(h)&&
+   (fallAttackers[h.clan]||[]).includes(s.clan);
+  if(attacker){
+   if(!Array.isArray(s.pendingAttackFalls))s.pendingAttackFalls=[];
+   if(!s.pendingAttackFalls.includes(h.clan))s.pendingAttackFalls.push(h.clan);
+  }
+  const serving=s.clan===h.clan&&s.rank!=='大名';
+  if(s.local===h.clan)s.local=historicalSuccessor(h.clan,year);
+  // すでに滅亡した大名家からの勧誘予約は破棄する。
+  if(s.foreignInvitationPending===h.clan)s.foreignInvitationPending=null;
+  if(serving&&showNews&&year===h.year&&s.alive){
+   s.pendingHistoricalFall=h.clan;
+   note(h.year+'年、'+(h.battle||'家中の変事')+'。主家の命運をかけた事態に直面した。');
+  }else if(serving){
+   // 旧セーブを過去の年から読み込んだ場合も滅亡済みの家には残れない。
+   s.previousService={clan:h.clan,rank:s.rank,year,reason:'主家滅亡'};s.clan=null;s.rank='浪人';s.trust=0;s.pendingBattle=false;
+   note(h.title+'。主家を失い浪人となった。');
+   if(showNews)queueMilestone('主家滅亡 ― 浪人となる',h.story+'\nあなたは主家を失い、浪人となった。');
+  }else if(showNews&&year===h.year&&!attacker){
+   const battleId=fallHistoryBattle(h);
+   const nationalParticipant=battleId==='osaka_summer'||(battleId&&nationalHistory.some(x=>x.id===battleId&&x.clans&&x.clans.includes(s.clan)));
+   if(!nationalParticipant){
+    announceHistoricalFall(h);
+    // This is the same national event: don't also show a redundant generic war bulletin.
+    if(battleId)nationalEventSeen()[battleId]=true;
+   }
+  }
+ }
+ // 過去年のセーブや旧バージョンで既に滅んだ勢力を再び所属先にしない。
+ if(s.local&&fallenHouse(s.local,year))s.local=historicalSuccessor(s.local,year);
+}
+function historicalFallScene(){
+ const h=historicalFalls.find(x=>x.clan===s.pendingHistoricalFall);
+ if(!h){s.pendingHistoricalFall=null;return choose()}
+ const war=h.type==='battle',isFall=/没落|失陥|開城/.test(h.title)||['赤松家','長宗我部家'].includes(h.clan),outcome=isFall?'没落':'滅亡';
+ const beforeRank=s.rank;
+ const battlefield={
+  '大内家':'毛利軍は周防・長門を制圧しつつある。大内義長は長門へ追い詰められ、最後の抵抗が続いている。',
+  '斎藤家':'織田信長の軍勢が稲葉山城に迫る。斎藤龍興の家臣たちは浮き足立ち、城内には敗色が濃い。',
+  '六角家':'織田軍が近江に侵入した。六角承禎・義治父子は観音寺城を捨てる構えで、家中は混乱している。',
+  '今川家':'掛川城は徳川軍に囲まれた。今川氏真は籠城を続けたが、和議と開城の知らせが家臣たちに届く。',
+  '浦上家':'かつての家臣・宇喜多直家が離反した。天神山城は包囲され、浦上宗景のもとに残る兵も少なくなった。',
+  '波多野家':'八上城は長い包囲によって兵糧が尽きた。明智光秀の軍勢に抗しきれず、波多野秀治らの命運が尽きようとしている。',
+  '武田家':'織田・徳川連合軍の甲州征伐で武田勢は崩壊。勝頼の退路も断たれ、天目山で最後の戦いが始まった。',
+  '朝倉家':'織田軍が越前へ攻め入り、一乗谷は炎に包まれた。朝倉義景は逃走を続けるが、家中の離反が相次ぐ。',
+  '浅井家':'織田軍が小谷城を包囲し、浅井長政の籠る本丸へ迫る。落城は目前に迫っている。',
+  '長宗我部家':'羽柴秀吉の四国攻めで長宗我部軍は各地で敗れた。元親は降伏を決断し、四国の独立支配は終わろうとしている。',
+  '北条家':'豊臣秀吉の大軍が小田原城を包囲した。諸城は降伏し、北条家中は籠城を続けるか降伏するかで揺れている。',
+  '豊臣家':'徳川軍が大坂城へ押し寄せる。大坂夏の陣の戦火は城内に及び、豊臣秀頼の命運が尽きようとしている。'
+ };
+ const incident={
+  '赤松家':'関ヶ原の戦いを経て、赤松宗家の所領と大名としての立場が失われていく。家中では処分の報を待つ者と、身の振り方を探る者が入り乱れている。',
+  '龍造寺家':'龍造寺高房の死と政家の死去が相次いだ。肥前の支配は鍋島家へ移り、旧龍造寺家の家臣たちは新たな主を選ぶか浪人になるか迫られている。'
+ };
+ // 決着前は史実の勝敗・主家の存亡を明かさない。結末は選択後の結果で表示する。
+ const preBattle={
+  '大内家':'毛利軍が周防・長門へ進攻し、大内家の城々では緊迫した戦況が続いている。',
+  '斎藤家':'織田信長の軍勢が稲葉山城に迫る。斎藤家中は防戦の準備に追われている。',
+  '六角家':'織田軍が近江へ侵入した。六角家中では迎撃か撤退か、評議が続いている。',
+  '今川家':'徳川軍が掛川城を囲んでいる。今川家中では抗戦と和議の両論が交わされている。',
+  '浦上家':'宇喜多直家の離反によって天神山城周辺は緊張に包まれた。諸将の動向も定まらない。',
+  '波多野家':'八上城を明智光秀の軍勢が包囲している。兵糧は乏しく、城内では今後の策が話し合われている。',
+  '武田家':'織田・徳川の大軍が甲斐へ迫る。武田家中では迎撃と撤退をめぐり議論が続いている。',
+  '朝倉家':'織田軍が越前へ侵攻した。朝倉家中は兵を集め、敵の進軍に備えている。',
+  '浅井家':'織田軍が小谷城を囲んだ。浅井家中では守備を固め、援軍の到着を待っている。',
+  '長宗我部家':'羽柴秀吉の大軍が四国に迫る。長宗我部家中では各地の防備を固めている。',
+  '北条家':'豊臣秀吉の大軍が小田原城へ向かう。北条家中では籠城と迎撃の策が練られている。',
+  '豊臣家':'徳川軍が大坂城に迫る。城内では総力を挙げて迎撃の準備が進んでいる。'
+ };
+ const preIncident={
+  '赤松家':'関ヶ原の戦いを経て、赤松家の所領をめぐる情勢が不安定になった。戦後の処分を案じる声が家中に広がる。',
+  '龍造寺家':'龍造寺家中では当主の継承をめぐる動きが続き、鍋島家との関係にも緊張が走っている。'
+ };
+ const sceneTitle=war?h.battle:'家中の変事 ― '+h.clan;
+ const ominousWar=[
+  'この戦いは、後の世まで語り継がれる大戦となるかもしれない。',
+  '戦場に漂う重苦しい空気が、ただならぬ戦の始まりを告げている。',
+  'これまでの戦とは何かが違う。あなたは胸騒ぎを覚えた。',
+  'この一戦を境に、国のありようが大きく変わるかもしれない。',
+  '敵味方ともに並々ならぬ覚悟で臨んでいる。歴史に残る戦になりそうだ。',
+  '家中の誰もが、この戦いが大きな節目になることを予感していた。'
+ ];
+ const ominousIncident=[
+  '家中に漂う不穏な空気に、あなたは時代の変わり目を感じた。',
+  '何かが大きく変わろうとしている。そんな嫌な予感が胸をよぎる。',
+  'この一件は、後の世にまで影響を残すかもしれない。',
+  '誰もが口をつぐんでいる。家中の行く末を左右する時が近づいていた。'
+ ];
+ const foreboding=P(war?ominousWar:ominousIncident);
+ const intro=(war?'【合戦】'+h.battle+'\n'+(preBattle[h.clan]||'敵軍の進攻が迫り、家中は緊張に包まれている。'):'【家中の変事】'+(preIncident[h.clan]||'主家を揺るがす事件が起こり、家中は混乱している。'))+'\n\nあなたは'+h.clan+'の'+beforeRank+'として、この'+(war?'戦場':'変事')+'に立ち会っている。\n'+foreboding+'\nあなたはどう行動するか。';
+ const finish=(flavor,healthLoss,wealthLoss,meritGain)=>{
+  const old=h.clan,year=birthYear()+s.age;
+  s.pendingHistoricalFall=null;s.pendingBattle=false;
+  const sameWar=nationalHistory.find(x=>x.year===year&&x.clans&&x.clans.includes(old)&&['shikoku','odawara'].includes(x.id)||x.year===year&&x.id==='osaka_summer'&&old==='豊臣家');
+  if(sameWar)nationalEventSeen()[sameWar.id]=true;
+  s.previousService={clan:old,rank:beforeRank,year,reason:outcome};
+  if(!Array.isArray(s.serviceHistory))s.serviceHistory=[];
+  s.serviceHistory.push({...s.previousService});
+  s.clan=null;s.rank='浪人';s.trust=0;
+  if(war&&s.alive&&!s.pendingDefeatDecision&&R(1,100)<=(/城|大坂/.test(h.title)?25:12)){
+   s.pendingDefeatDecision={type:'lastStand',castle:/城|大坂/.test(h.title),clan:old,rank:beforeRank};
+  }
+  if(healthLoss)mod('健康',-healthLoss);
+  if(wealthLoss)mod('財産',-wealthLoss);
+  if(meritGain)s.merit=(s.merit||0)+meritGain;
+  if(!Array.isArray(s.achievements))s.achievements=[];
+  s.achievements.push({age:s.age,year,kind:'主家滅亡',summary:old+'が大名として'+outcome+'し、元'+old+beforeRank+'として浪人となった'});
+  if(!s.historicalFallAnnounced||typeof s.historicalFallAnnounced!=='object')s.historicalFallAnnounced={};
+  s.historicalFallAnnounced[old]=true;
+  queueMilestone('主家の'+outcome+' ― 浪人へ',year+'年、'+h.title+'。\n'+old+'は独立した大名としての地位を失った。\nあなたは「元'+old+beforeRank+'」として浪人となった。');
+  return flavor+'\n\n【史実の結末】'+old+'は大名として'+outcome+'した。あなたも禄を失い、浪人となった。\nかつての身分：'+old+'の'+beforeRank+'。';
+ };
+ const trial=(stat,base,good,bad,successEffects,failEffects)=>()=>{
+  const chance=Math.min(94,Math.max(8,base+Math.floor((s.stats[stat]||0)*.68)));
+  const success=R(1,100)<=chance;
+  const effects=success?successEffects:failEffects;
+  return finish((success?'【成功】':'【苦戦】')+ (success?good:bad),effects[0],effects[1],effects[2]);
+ };
+ const opts=war?[
+  opt('主君の退路を守り、最後まで戦う','武勇で判定／負傷の危険',trial('武勇',25,'迫る敵を押しとどめ、味方の退却を助けた。武名は敗残の者たちに語り継がれた。','必死に槍を振るったが敵勢に押し込まれ、傷を負って落ち延びた。',[R(1,4),0,2],[R(6,12),R(0,3),0])),
+  opt('戦況を読み、味方の退路を開く','知略で判定／失敗時は財産・健康を失う',trial('知略',28,'敵の動きを読み、兵を散らさずに退却させた。多くの仲間を救った。','退路を見誤り、敵に追われて荷を捨てながら逃れた。',[R(0,2),R(0,2),1],[R(3,8),R(3,7),0])),
+  opt('家族と旧臣をまとめ、安全な地へ逃れる','魅力で判定／財産を失う恐れ',trial('魅力',30,'混乱の中でも人々をまとめ、家族と旧臣を無事に連れ出した。','人々は散り散りになり、蓄えを捨ててようやく生き延びた。',[0,R(1,3),0],[R(1,4),R(5,10),0]))
+ ]:[
+  opt('旧主家の家臣たちをまとめ、身の振り方を探る','魅力で判定／家中の混乱に対処',trial('魅力',28,'旧臣たちの混乱を収め、互いに助け合う道筋をつけた。','旧臣たちは離散し、奔走した分だけ財を失った。',[0,R(0,2),1],[0,R(3,7),0])),
+  opt('政変の行方を見極め、家族を守って領国を去る','知略で判定／逃避行の負担',trial('知略',34,'危険な道を避け、家族とともに無事に領国を離れた。','情勢を読み違え、関所で足止めされて多くの蓄えを失った。',[0,R(1,3),0],[R(0,3),R(4,8),0])),
+  opt('旧主への義理を尽くし、最後まで屋敷を守る','武勇で判定／負傷の危険',trial('武勇',27,'混乱に乗じた狼藉者を退け、旧主の家財と縁者を守り抜いた。','狼藉者と争い、傷を負いながら屋敷を離れた。',[R(0,2),0,1],[R(4,9),R(1,4),0]))
+ ];
+ return scene(sceneTitle,intro,opts);
+}
+function applyHistoricalRenames(showNews){
+ if(!s)return;
+ if(!s.historicalRenamesSeen||typeof s.historicalRenamesSeen!=='object')s.historicalRenamesSeen={};
+ const year=birthYear()+s.age;
+ for(const h of historicalRenames){
+  if(year<h.year)continue;
+  const active=s.clan===h.from&&s.rank!=='大名';
+  const local=s.local===h.from;
+  const subject=s.rank==='大名'&&!s.independent&&s.overlord===h.from;
+  if(subject)s.overlord=h.to;
+  if(s.lordInLaw===h.from)s.lordInLaw=h.to;
+  const changed=active||local||subject;
+  if(active)s.clan=h.to;
+  if(local)s.local=h.to;
+  // 勧誘履歴も同じ家のまま継承し、二度断った家が別名で再来しないようにする。
+  if(s.foreignInvitationHistory&&Object.prototype.hasOwnProperty.call(s.foreignInvitationHistory,h.from)){
+   s.foreignInvitationHistory[h.to]=Math.max(s.foreignInvitationHistory[h.to]||0,s.foreignInvitationHistory[h.from]||0);
+   delete s.foreignInvitationHistory[h.from];
+  }
+  if(s.foreignInvitationPending===h.from)s.foreignInvitationPending=h.to;
+  if(!s.historicalRenamesSeen[h.year]){
+   s.historicalRenamesSeen[h.year]=true;
+   if(showNews&&year===h.year){
+    const affiliation=subject?'\n従属先の主家も'+h.to+'と改称された。':active?'\nあなたの主家も'+h.to+'となった。身分は'+s.rank+'のまま、引き続き同じ主君に仕える。':local?'\n故郷の領主も'+h.to+'と呼ばれるようになった。':'\nこの知らせは各地に伝わり、乱世の勢力図に新たな名が刻まれた。';
+    queueMilestone('史実の転機 ― '+h.title,h.year+'年。\n'+h.body+affiliation);
+    note(h.title+'。'+(active?'主家の名が'+h.to+'となった。':local?'故郷の領主の名が'+h.to+'となった。':'遠国から改姓の報が届いた。'));
+    if(!Array.isArray(s.achievements))s.achievements=[];
+    if(active)s.achievements.push({age:s.age,year,kind:'主家改姓',summary:h.from+'が'+h.to+'となり、'+s.rank+'として引き続き仕えた'});
+   }
+  }
+ }
+}
+const heal=(n)=>{s.stats.健康=C(s.stats.健康+n)};const note=t=>{s.diary.push({year:birthYear()+s.age,text:t});if(s.diary.length>220)s.diary.shift()};const traitText=()=>s.body==='病弱'?'幼い頃から病がちで、体調を崩しやすい。':s.body==='丈夫'?'生来丈夫な身体を持つ。':'特に病弱ということはない。';function newLife(){let surname=$('surname').value.trim()||P(surnames),n=$('name').value.trim()||P(maleNames);const initialFamily=startingFamilyNames(n);let h=R(1,100),house=h<=70?'百姓':h<=85?'商家':h<=97?'下級武家':'有力武家',reg=P(provinces),body=P(['普通','普通','普通','普通','丈夫','病弱']),wealth=house==='百姓'?R(6,22):house==='商家'?R(22,60):house==='下級武家'?R(14,40):R(45,85);s={name:surname+' '+n,birthYear:1540,gunAge:R(6,15),gunSeen:false,age:0,region:reg[0],local:reg[0]==='信濃'?P(['武田家','長尾家']):reg[1],house,rank:house,clan:null,body,stats:{健康:C(R(46,57)+(body==='丈夫'?8:body==='病弱'?-10:0)),武勇:R(0,3),知略:R(0,3),魅力:R(0,3),財産:wealth},talent:{武勇:R(0,3),知略:R(0,3),魅力:R(0,3)},merit:0,trust:0,achievements:[],spouse:null,marriageYear:null,formerWives:[],firstWifeName:null,divorceOfferResolved:false,hostage:null,hostageOfferResolved:false,children:0,childRecords:[],heirSon:null,successionMode:null,successionYear:null,siblings:initialFamily.siblings,parents:initialFamily.parents,reputation:[],diary:[],alive:true,cause:'',phase:'event',scene:null,result:null,eventsThisYear:0,yearLimit:1,seasonIndex:0,seen:{},retired:false,injury:0,wealthy:false,highestMilitaryRank:null,failedRebellions:[]};note(s.region+'の'+s.house+'に生まれた。');
+const origins={
+ '百姓':'田畑を耕し、日々の暮らしを支える百姓の家。豊かな暮らしではないが、家族は懸命に生きている。',
+ '商家':'品物を仕入れ、売り買いして生計を立てる商家。家には商いの知恵と人の縁が受け継がれている。',
+ '下級武家':'主君に仕える下級武士の家。武士の名を持ちながらも、暮らしは決して楽ではない。',
+ '有力武家':'土地と家臣を抱える有力武家。生まれながらに期待と責任を背負う家柄である。'
+};
+queueMilestone('誕生 ― '+s.house+'の家',
+ '天文九年、1540年。\n'+s.region+'の地に、'+s.name+'は生を受けた。\n\n'+
+ 'あなたが生まれたのは「'+s.house+'」の家。\n'+origins[s.house]+
+ '\n\n生まれる家は選べない。ここから、あなただけの戦国の人生が始まる。');
+save();render();nextEvent();showMilestone()}
+// 仕官・昇進・独立・浪人などの立場の変化をイベント結果とは別画面で告知する。
+function queueMilestone(title,body){if(!Array.isArray(s.milestones))s.milestones=[];s.milestones.push({title,body});save()}
+function detectMilestone(oldRank,oldClan,oldCastle){
+ if(!s)return;
+ const rank=s.rank,clan=s.clan;
+ if(!oldClan&&clan&&rank!=='大名')queueMilestone('仕官 ― '+clan,clan+'に仕えることとなった。\n新たな身分：'+rank+'。\nここから武家での人生が始まる。');
+ else if(oldClan&&!clan)queueMilestone('主家を離れる',oldClan+'との主従関係が終わった。\n現在の身分：'+rank+'。');
+ else if(oldClan&&clan&&oldClan!==clan&&rank!=='大名')queueMilestone('主家の変更',oldClan+'を離れ、'+clan+'に仕えることとなった。');
+ if(oldRank!==rank){
+  if(rank==='大名')queueMilestone('大名となる',s.name+'は'+daimyoStatus()+'となった。\n居城：'+(s.castle||'城')+'\n自らの家の命運を担うこととなる。');
+  else if(['足軽','足軽大将','家臣','重臣','家中筆頭'].includes(rank))queueMilestone(oldClan?'昇進 ― '+rank:'新たな身分 ― '+rank,(oldClan?'これまでの働きが認められ、':'武家の一員として、')+rank+'となった。\n現在の主家：'+(clan||'なし'));
+  else if(['小商人','商家の当主','豪商','御用商人'].includes(rank))queueMilestone('商人の身分 ― '+rank,'商人として'+rank+'となった。');
+  else if(rank==='百姓'&&oldRank==='浪人')queueMilestone('武士の道を離れる ― 百姓','刀を置き、百姓として新たな暮らしを始めた。');
+  else if(rank==='浪人')queueMilestone('浪人となる','仕える家を失い、浪人となった。\n新たな仕官先を探すことができる。');
+ }
+ if(s.castle&&s.castle!==oldCastle&&rank!=='大名')queueMilestone('居城を得る',s.castle+'を居城とすることとなった。');
+}
+function showMilestone(){const m=s&&Array.isArray(s.milestones)&&s.milestones[0];const el=$('milestone');if(!m){el.classList.add('hidden');return} $('milestone-title').textContent=m.title;$('milestone-body').textContent=m.body;el.classList.remove('hidden')}
+$('milestone-ok').onclick=()=>{if(!s)return;s.milestones.shift();save();showMilestone()};
+function render(){if(s&&s.housePower&&s.housePower.clan!==s.clan)clearHousePower();if(!s){$('start').classList.remove('hidden');$('game').classList.add('hidden');let a=JSON.parse(safeStore.getItem(ARCH)||'[]');$('archives').textContent=a.length?'過去の人生：'+a.slice(0,3).map(x=>x.name+'（'+x.age+'歳）').join('、'):'';return}$('start').classList.add('hidden');$('game').classList.remove('hidden');$('who').textContent=s.name;$('when').textContent=(birthYear()+s.age)+'年'+(seasonName()?'・'+seasonName():'')+'・'+s.age+'歳';$('position').textContent=s.region+'出身 ／ '+(s.clan&&['百姓','商家','商人','下級武家','有力武家'].includes(s.rank)?(['下級武家','有力武家'].includes(s.house)?'足軽大将':'足軽'):daimyoStatus())+(s.clan?(s.rank==='大名'?' ／ '+s.clan+'を治める':s.rank==='家中筆頭'?' ／ '+s.clan+'の実権掌握':' ／ '+s.clan+'に仕官'):'')+(s.successionMode==='regent'?' ／ 家督譲渡・実権維持':s.successionMode==='full'?' ／ 完全隠居':'');$('stats').innerHTML='';st.forEach(k=>{let x=document.createElement('div');x.className='stat';x.innerHTML='<small></small><b></b>';x.children[0].textContent=k;x.children[1].textContent=s.stats[k];$('stats').append(x)});$('tags').innerHTML='';[s.body,...s.reputation.slice(-2)].forEach(t=>{let x=document.createElement('span');x.className='pill';x.textContent=t;$('tags').append(x)});save()}
+// 行動の成否を能力値に連動させる。合戦は既存の戦闘判定を使用する。
+const skillForAction=(label)=>{
+ if(/(策略|策を|計略|奇策|調略|寝返|罠を|伏兵|裏をか|謀略|説き伏せ|交渉|仲裁|裁定|説得|条件を詰め|知恵で|駆け引き|出し抜)/.test(label))return '知略';
+ if(/(討ち取|追い払|立ち向か|取り押さえ|斬り込|力ずく|打ち破|撃退)/.test(label))return '武勇';
+ if(/(協力を頼|味方につけ|人々をまとめ|仲間を集め|協力を取り付け)/.test(label))return '魅力';
+ return null;
+};
+// 財産が尽きた場合、費用を要する行動は選択できない。
+// 『財産－』等を明示する選択肢を対象とし、単なる損害リスクは対象外。
+const needsFunds=(label,desc)=>/財産(?:大幅)?[－−-]|財産を消費|費用|旅費|礼金|私財|銭を払|金を払|購入|買い求め|雇って|贈り物を送|祝いの品を配/.test(desc+' '+label);
+const opt=(label,desc,fn,ok=()=>true)=>{
+ const originalOk=ok;
+ ok=()=>originalOk()&&!(s&&s.stats&&s.stats.財産<=0&&needsFunds(label,desc));
+ const skill=skillForAction(label);
+ return {label,desc:skill?desc+'／'+skill+'で成否判定':desc,ok,fn:()=>{
+  // 合戦は戦闘専用の勝敗・討死処理に委ね、判定を二重にしない。
+  if(!skill||!s||!s.stats||((e&&(/初陣|合戦|野戦|籠城戦|攻城戦|兵糧攻め|奇襲戦|夜襲戦|謀反/.test(e.title)))))return fn();
+  const val=s.stats[skill]||0;
+  const chance=(val<=5?0:Math.max(2,Math.min(94,Math.round((val-5)*.94)+(skill==='知略'&&val>=50?11+Math.floor((val-50)/5):0))));
+  if(R(1,100)<=chance)return '【成功・'+skill+val+'／成功率'+chance+'％】'+fn();
+  // 失敗時は元の成功処理を実行せず、能力・評判・財産などに代償を与える。
+  const cost={};cost[skill]=-R(1,3);
+  if(skill==='武勇')cost.健康=-R(2,6);
+  else if(skill==='知略')cost.財産=-R(1,4);
+  else cost.魅力=-R(2,4);
+  if(s.clan){s.trust=Math.max(0,(s.trust||0)-1)}
+  return '【失敗・'+skill+val+'／成功率'+chance+'％】試みたが、経験と力量が足りず思うような成果は得られなかった。'+change(cost,'周囲の信用や蓄えにも影響が残った。');
+ }};
+};const extras={
+'幼い日の病':[['家族に湯と粥を用意してもらい、静養する','健康＋の可能性／財産－',()=>change({健康:R(2,6),財産:-R(1,3)},'家族の看病を受け、少しずつ熱が引いた。')],['薬を求めて遠方の医師を頼る','財産大幅－／健康＋の可能性',()=>change({健康:R(4,10),財産:-R(5,9)},'医師の手当てを受けた。家の蓄えは大きく減った。')]],
+'幼い日々':[['家族と穏やかに過ごす','健康＋／財産－',()=>change({健康:R(2,5),財産:-R(1,2)},'家族のもとで身体を休め、穏やかに過ごした。')],['家の仕事を眺め、道具の使い方を覚える','知略＋／健康－',()=>change({知略:R(1,3),健康:-R(1,2)},'家の仕事を見て覚えたが、幼い身体には疲れが残った。')],['近所の子供と遊ぶ','魅力＋／健康－',()=>change({魅力:R(1,3),健康:-R(1,2)},'近所の子供と親しくなり、日が暮れるまで遊んだ。')]],
+'家業の手伝い':[['家族の負担を減らすため、仕事を休んで体を整える','健康＋／財産－',()=>change({健康:R(5,9),財産:-R(2,4)},'仕事は遅れたが、疲れた身体を休められた。')],['売り物の傷みを見分けて市場へ運ぶ','財産＋／健康－／魅力－',()=>change({財産:R(4,8),健康:-R(2,4),魅力:-R(1,3)},'売上は増えたが、運搬の疲れと値切り交渉が残った。')]],
+'寺での学び':[['庭掃除を終えて早めに帰り、体を休める','健康＋／知略－',()=>change({健康:R(4,7),知略:-R(1,3)},'学びは途中になったが、身体を休めることができた。')],['寺の市で筆や紙を売る手伝いをする','財産＋／知略－',()=>change({財産:R(3,7),知略:-R(1,3)},'僧に頼まれた品が売れ、わずかな銭を受け取った。')]],
+'村の若者たち':[['川原の勝負を見送り、傷を負わないようにする','健康＋／武勇－',()=>change({健康:R(3,7),武勇:-R(2,4)},'無理な力比べを避け、怪我をせずに済んだ。')],['勝負の見物人に食べ物を売る','財産＋／魅力－',()=>change({財産:R(3,6),魅力:-R(1,3)},'見物人を相手に小銭を稼いだが、仲間からは冷やかされた。')]],
+'武士の行列':[['行列を見送り、茶屋で身体を休める','健康＋／財産－',()=>change({健康:R(4,7),財産:-R(2,4)},'行軍の騒ぎを避け、茶屋で疲れを癒した。')],['荷駄の商人に水や食べ物を売る','財産＋／魅力－／健康－',()=>change({財産:R(4,8),魅力:-R(1,3),健康:-R(1,3)},'商人に品物を売り、わずかな利益を得た。')]],
+'初陣への道 ― 足軽の募集':[['募集を見送り、家業に専念する','財産＋／武勇－',()=>change({財産:R(3,6),武勇:-R(1,3)},'初陣を見送り、家の蓄えを増やした。')],['静養して次の戦に備える','健康＋／財産－',()=>change({健康:R(4,8),財産:-R(2,4)},'初陣は見送り、身体を整えた。')]],
+'足軽の募集':[['募集を見送り、家の蓄えを増やす','財産＋／武勇－',()=>change({財産:R(3,6),武勇:-R(1,3)},'戦場には出ず、家の仕事で蓄えを増やした。')],['身体を休め、次の募集を待つ','健康＋／財産－',()=>change({健康:R(4,8),財産:-R(2,4)},'今回は見送り、戦に備えて身体を整えた。')]],
+'川を挟んだ対陣':[['敵の矢を避け、渡河前に兵を休ませる','健康減少なし／武勇－／魅力＋',()=>battleOutcome(false,'rest')],['荷駄を守り、補給路を確保する','健康－（合戦）／財産＋の可能性',()=>battleOutcome(false,'supply')]],
+'城下の小競り合い':[['城門の陰で負傷者を手当てする','健康減少なし／魅力＋',()=>battleOutcome(false,'rest')],['店の並ぶ通りを確保し、物資を守る','健康－（合戦）／財産＋の可能性',()=>battleOutcome(false,'supply')]],
+'夜明けの野戦':[['崩れた味方を後方で休ませ、陣形を整える','健康減少なし／魅力＋',()=>battleOutcome(false,'rest')],['敵の荷駄隊を狙って補給を乱す','健康－（合戦）／財産＋の可能性',()=>battleOutcome(false,'supply')]],
+'山道での遭遇戦':[['斜面に兵を伏せ、敵の通過を待つ','健康減少なし／知略＋',()=>battleOutcome(false,'rest')],['荷駄の積み荷を守り、撤退路を開く','健康－（合戦）／財産＋の可能性',()=>battleOutcome(false,'supply')]],
+'古参家臣との確執':[['しばらく静養し、争いから距離を置く','健康＋／魅力－',()=>change({健康:R(4,8),魅力:-R(2,5)},'家中の争いを避け、心身を休めた。')],['証人に礼金を渡し、協力を取り付ける','財産－／知略＋',()=>change({財産:-R(4,7),知略:R(3,6)},'証人の協力を得たが、礼金で蓄えが減った。')]],
+'領内の不作':[['私財を投じて困窮した村を支える','財産大幅－／魅力＋',()=>change({財産:-R(6,11),魅力:R(4,7)},'私財を配り、飢えた村人を支えた。')],['不作地の見回りを控え、身体を休める','健康＋／魅力－',()=>change({健康:R(4,7),魅力:-R(2,4)},'疲労は回復したが、村人への対応は遅れた。')]],
+'旧友からの便り':[['返書と贈り物を送り、旧交を保つ','財産－／魅力＋',()=>change({財産:-R(3,6),魅力:R(3,6)},'敵味方を越えて、旧友との縁を保った。')],['旅を控え、傷ついた身体を養生する','健康＋／知略－',()=>change({健康:R(4,8),知略:-R(1,3)},'危険な旅を見送り、身体を休めた。')]],
+'主君からの使い':[['旅費を節約して宿場で商いを手伝う','財産＋／魅力－',()=>change({財産:R(3,6),魅力:-R(2,4)},'旅費を節約できたが、使者の務めは遅れた。')],['護衛を増やし、道中で休息を取る','健康＋／財産－',()=>change({健康:R(3,6),財産:-R(3,6)},'道中の安全を優先し、疲労を抑えた。')]],
+'戦火が迫る':[['兵の募集を探す','武功による立身の機会／健康－',()=>{s.clan=s.clan||s.local;s.rank='足軽';s.pendingBattle=true;return '兵として出陣することとなった。組頭の命令を待つ。'}],['家財を売り払い、遠方へ避難する','財産－／健康＋',()=>change({財産:-R(5,9),健康:R(3,6)},'家財を手放し、家族とともに戦火を逃れた。')]],
+'暮らしの日々':[['兵の募集を探す','初陣・仕官の機会を探す',()=>{s.seen.seek=true;return '兵の募集を探し始めた。次の機会には戦場に立てるかもしれない。'}],['働きすぎた身体を休める','健康＋／財産－',()=>change({健康:R(5,9),財産:-R(2,5)},'仕事を控えて療養し、身体を立て直した。')],['市場に品物を持ち込み、売り先を増やす','財産＋／健康－／魅力－',()=>change({財産:R(4,8),健康:-R(2,5),魅力:-R(1,3)},'売り先を増やし、収入を得たが疲れが残った。')]],
+'浪人の日々':[['働き口を得て日々の糧を稼ぐ','財産＋／武勇－／健康－',()=>change({財産:R(4,7),武勇:-R(1,3),健康:-R(2,4)},'人足仕事で銭を得たが、武芸からは遠ざかった。')],['無理な旅を控え、身体を休める','健康＋／財産－',()=>change({健康:R(5,9),財産:-R(2,4)},'旅を控えて静養し、体力を取り戻した。')]],
+'縁談':[['相手の家柄や暮らしを調べてから返事をする','知略＋／魅力－',()=>change({知略:R(2,4),魅力:-R(1,3)},'縁談の返事を保留し、相手の事情を確かめた。')],['祝いの支度を整えて縁談を受ける','財産－／魅力＋',()=>{s.spouse=chooseMarriageName();if(!s.firstWifeName)s.firstWifeName=s.spouse;s.marriageYear=birthYear()+s.age;return change({財産:-R(3,7),魅力:R(2,5)},'祝言を挙げ、家族を迎えた。')}]],
+'家族が増えた':[['産後の家族をいたわり、仕事を控える','健康＋／財産－',()=>change({健康:R(3,6),財産:-R(2,5)},'家族を支えるため、しばらく仕事を控えた。')],['祝いの品を配り、親類との縁を深める','魅力＋／財産－',()=>change({魅力:R(3,6),財産:-R(3,6)},'祝いの品を配り、親類との結びつきを強めた。')],['家業に励み、子のための蓄えを作る','財産＋／健康－',()=>change({財産:R(3,6),健康:-R(2,4)},'子の将来に備え、懸命に働いた。')]]
+};
+// Ver.7.1: 赤い自害の選択肢は天涯孤独の特殊ルートでのみ表示する。
+const endingLines=[
+ '長い戦乱の日々に心が折れ、あなたは自ら人生を終えることを選んだ。',
+ '幾度も道を選び直してきたが、ここであなたの歩みは途絶えた。',
+ '乱世に生きる重さに耐えきれず、あなたは自ら生涯に幕を下ろした。',
+ '積み重なった苦難の末、あなたはこれ以上生きる道を選ばなかった。'
+];
+const endingLabels=['生きるのに疲れた（自害）','もう歩き続けられない（自害）','すべてを終わらせたい（自害）','生きる気力を失った（自害）'];
+function endingOption(){
+ const label=P(endingLabels);
+ return {label,desc:'この人生を終了する／取り消せません',endingChoice:true,ok:()=>true,fn:()=>{
+  s.pendingDefeatDecision=null;s.pendingHistoricalFall=null;s.pendingBattle=false;
+  s.pendingRebellionSide=null;s.rebellionBattleActive=false;s.pendingHonnojiAttack=false;
+  s.alive=false;s.cause='自ら命を絶ち、生涯を閉じた。';
+  return P(endingLines);
+ }};
+}
+// 元家臣以上が特定の経緯で浪人となった直後だけ、まれに発生する特殊ルート。
+function maybeFamilyTragedy(oldClan,oldRank){
+ if(!s||!s.alive||!oldClan||s.clan||s.rank!=='浪人'||s.familyMassacre)return '';
+ if(!['家臣','重臣','家中筆頭','大名'].includes(oldRank))return '';
+ const reason=(s.previousService&&s.previousService.reason)||'';
+ if(!/切腹命令.*逃亡|謀反.*失敗|下剋上.*失敗|滅亡|没落|独立喪失/.test(reason))return '';
+ const hasFamily=(Array.isArray(s.parents)&&s.parents.length>0)||(Array.isArray(s.siblings)&&s.siblings.length>0)||!!s.spouse||(s.children||0)>0;
+ if(!hasFamily||R(1,100)>5)return '';
+ const year=birthYear()+s.age;
+ s.familyMassacre={year,clan:oldClan,reason};
+ s.parents=[];s.siblings=[];s.spouse=null;s.marriageYear=null;s.children=0;s.childRecords=[];s.hostage=null;s.heirSon=null;
+ s.roninWard=null;
+ s.reputation.push('天涯孤独');
+ mod('健康',-R(5,11));mod('魅力',-R(2,5));
+ if(!Array.isArray(s.achievements))s.achievements=[];
+ s.achievements.push({age:s.age,year,kind:'天涯孤独',summary:'主家を失った混乱の中、家族をことごとく失い、天涯孤独となった'});
+ return '\n\n【悲報】落ち延びた先で、故郷の家族が戦乱と報復に巻き込まれ、一人も生き残らなかったと知らされた。あなたはすべての肉親を失い、天涯孤独の身となった。';
+}
+// 天涯孤独の浪人が、村娘の握り飯に救われる分岐。通常の浪人には発生しない。
+function riceBallVillageScene(){
+ const girl=P(femaleNames);
+ s.villageGirlCandidate=girl;
+ return scene('しょっぱい握り飯','何日もまともに食べられず、あなたは村外れの道端に倒れ込んだ。\n通りかかった村娘が、黙って握り飯を差し出した。\n「よかったら、召し上がってください」\n\nひと口食べると、なぜかひどくしょっぱい味がした。\n娘は何も尋ねず、あなたが食べ終えるまで傍らに座っていた。',[
+  opt('娘と祝言を挙げ、この村で百姓として生きる','武士の道を離れる／村娘と結婚／後日、特別な出来事が発生',()=>{
+   s.villageRiceSeen=true;s.spouse=girl;if(!s.firstWifeName)s.firstWifeName=girl;s.marriageYear=birthYear()+s.age;s.villageWife=girl;s.villageRaidYear=birthYear()+s.age+R(1,2);
+   s.clan=null;s.rank='百姓';s.abandonedWarrior=true;s.seen.seek=false;s.pendingBattle=false;s.roninReferral=0;s.retiredFromWarriorYear=birthYear()+s.age;
+   s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'新しい暮らし',summary:'倒れた自分を救った村娘と祝言を挙げ、村で百姓となった'});
+   mod('健康',R(5,10));return 'あなたは娘の名を聞き、やがて夫婦となった。刀を置いて畑を耕し、初めて自分の帰る場所を得た。あの握り飯のしょっぱさを、あなたは生涯忘れないだろう。';
+  }),
+  opt('村に身を寄せ、百姓として暮らす','武士を辞める／結婚はしない',()=>{
+   s.villageRiceSeen=true;s.clan=null;s.rank='百姓';s.abandonedWarrior=true;s.seen.seek=false;s.pendingBattle=false;s.roninReferral=0;s.retiredFromWarriorYear=birthYear()+s.age;
+   mod('健康',R(4,8));return '娘の厚意を受け、村で働くことにした。刀を置き、土を耕して生きる道を選んだ。';
+  }),
+  opt('握り飯に礼を言い、旅を続ける','浪人生活を続ける',()=>{s.villageRiceSeen=true;mod('健康',R(3,6));mod('魅力',R(1,3));return 'あなたは娘に深く頭を下げ、再び歩き始めた。握り飯の味だけが、いつまでも胸に残った。';})
+ ]);
+}
+// 村娘と結婚した場合は必ず発生する襲撃。どちらの選択でも村と妻を守る。
+function villageRaidScene(){
+ return scene('野盗の襲来 ― 守るべきもの','村に暮らし始めてしばらく経ったある夜、野盗の一団が押し寄せた。\n村人が逃げ惑う中、あなたの妻も危険にさらされている。\nかつて戦場で振るった腕が、今度はこの小さな村を守るために必要になった。\nあなたは妻と村人を逃がし、野盗の前に立ちはだかった。',[
+  opt('刀を取り、村と妻を守り抜く','必ず深手を負う／健康が大幅低下／死亡の危険が極めて高い',()=>villageRaidOutcome('刀を取り、野盗の前に立ちはだかった。')),
+  opt('村人を率いて迎え撃ち、妻を逃がす','必ず深手を負う／健康が大幅低下／死亡の危険が極めて高い',()=>villageRaidOutcome('村人を逃がすため、最後まで殿を務めた。'))
+ ]);
+}
+function villageRaidOutcome(start){
+ s.villageRaidDone=true;s.villageRaidYear=null;
+ const wound=R(76,108);
+ mod('健康',-wound);
+ mod('魅力',R(3,7));
+ s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'村の守り',summary:'野盗の襲撃から妻と村を守り、重傷を負った'});
+ if(s.stats.健康<=0){s.alive=false;s.cause='野盗から妻と村を守った際の深手がもとで亡くなった。';return start+' 野盗は退いた。妻も村人も無事だった。だがあなたが負った傷はあまりに深く、妻に見守られながら息を引き取った。';}
+ return start+' 野盗は退き、妻と村人は助かった。しかしあなたは深手を負い、床から起き上がることも難しくなった。傷が癒えるかどうかは分からない。';
+}
+function solitaryRoninScene(){
+ const v=P(['ruins','memento','stranger','vow']);
+ if(v==='ruins')return scene('故郷の跡','故郷の近くまで戻ると、かつての家は荒れ果てていた。家族の声はもう聞こえない。',[
+  opt('家の跡を片づける','健康－／魅力＋',()=>change({健康:-R(2,5),魅力:R(2,4)},'瓦礫を片づけ、失われた家族の面影を胸に刻んだ。')),
+  opt('静かに手を合わせる','健康＋／知略＋',()=>change({健康:R(2,5),知略:R(1,2)},'長くその場に立ち尽くし、再び歩き出す覚悟を固めた。'))]);
+ if(v==='memento')return scene('形見の品','旅の荷の底から、家族が残した小さな品が見つかった。忘れようとしても、思い出は消えない。',[
+  opt('大切に持ち続ける','魅力＋／健康＋',()=>change({魅力:R(2,3),健康:R(1,3)},'形見を懐にしまい、今日を生きる支えにした。')),
+  opt('寺に納める','財産－／知略＋',()=>change({財産:-R(1,3),知略:R(2,3)},'寺に形見を納め、静かに家族を弔った。'))]);
+ if(v==='stranger')return scene('見知らぬ者の厚意','街道の茶屋で、事情を知らぬ旅人が温かい飯を分けてくれた。ひとりで生きる日々にも、人の情けは残っている。',[
+  opt('礼を述べて受け取る','健康＋／魅力＋',()=>change({健康:R(3,6),魅力:R(1,3)},'久しぶりに人の温かさに触れ、少しだけ気持ちが和らいだ。')),
+  opt('代わりに仕事を手伝う','財産＋／健康－',()=>change({財産:R(2,4),健康:-R(1,3)},'働きで恩を返し、再び街道へ出た。'))]);
+ return scene('生き残った者の誓い','一人になってから、夜ごと過去の光景がよみがえる。それでも明日は訪れる。これから何を支えに生きるのか。',[
+  opt('もう一度、仕官を目指す','知略＋／武勇＋',()=>change({知略:R(1,3),武勇:R(1,3),健康:-R(1,3)},'かつての武士としての誇りを胸に、歩き始めた。')),
+  opt('誰かの命を守るために生きる','魅力＋／財産－',()=>change({魅力:R(3,5),財産:-R(1,2)},'同じ悲しみを繰り返さぬよう、困っている人を助けることにした。'))]);
+}
+const scene=(title,text,options)=>{if((title.indexOf('【初陣】')===0||title.indexOf('合戦 ― ')===0)&&s&&s.stats.健康<=20){options.push(opt('けがの影響で戦場には出られない','健康20以下限定／武勇・知略が少し低下／健康+20',()=>{mod('武勇',-R(1,3));mod('知略',-R(1,2));mod('健康',20);s.lastBattleAge=s.age;return '傷が癒えず、戦場に出ることはできなかった。出陣を見送り、戦働きと軍務の勘が少し鈍ったが、療養に専念したことで健康が20回復した。'}));}let more=extras[title]||[];let seen=new Set(options.map(x=>x.label));for(let [label,desc,fn] of more){if(!seen.has(label)){options.push(opt(label,desc,fn));seen.add(label)}}if(s&&s.familyMassacre)options.push(endingOption());return {title,text,options}};const reward=(k,n,text)=>{mod(k,n);if(n>0){let cost=k==='財産'?'健康':'財産';mod(cost,-1);text+=' そのために'+(cost==='健康'?'少し疲労が残った。':'わずかな費用を使った。')}return text};const risk=(p,reason)=>{if(R(1,100)<=p){s.alive=false;s.cause=reason;return true}return false};const change=(vals,msg)=>{let entries=Object.entries(vals),resolved={};for(const [k,v] of entries)resolved[k]=typeof v==='function'?v():v;
+// 選択に得失を持たせる。明示されたマイナスがない成長行動には小さな代償を付ける。
+if(Object.values(resolved).some(v=>v>0)&&!Object.values(resolved).some(v=>v<0)){
+ const gain=Object.keys(resolved).find(k=>resolved[k]>0);
+ const cost=gain==='健康'?'財産':gain==='財産'?'健康':(gain==='武勇'?'健康':'財産');
+ resolved[cost]=(resolved[cost]||0)-1;
+ msg+=' その一方、'+(cost==='健康'?'疲れが残った。':'費用もかかった。');
+}
+for(const [k,v] of Object.entries(resolved))mod(k,v);return msg};
+const strain=(level=1)=>{let n=R(3,6)+level*R(1,3)+(s.age>=55?R(1,2):0);mod('健康',-n);return n};
+const childhoodEvents=[
+{title:"川原の石投げ",text:"村の子らが川原で平たい石を跳ねさせている。",options:()=>[opt("石投げに加わる","武勇＋／健康－",()=>change({"武勇":2,"健康":-1},"石を遠くまで飛ばした。")),opt("跳ねる角度を工夫する","知略＋／武勇－",()=>change({"知略":2,"武勇":-1},"水面で石が何度も跳ねた。"))]},
+{title:"竹馬の名人",text:"年上の子が竹馬に乗って村道を歩いている。",options:()=>[opt("竹馬に挑む","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"何度も転びながら歩けるようになった。")),opt("足場を作って練習する","知略＋／財産－",()=>change({"知略":2,"財産":-1},"工夫して練習した。"))]},
+{title:"かくれんぼ",text:"友達が神社の境内でかくれんぼを始めた。",options:()=>[opt("誰にも見つからない場所を探す","知略＋／健康－",()=>change({"知略":2,"健康":-1},"最後まで見つからなかった。")),opt("鬼役を引き受ける","魅力＋／健康－",()=>change({"魅力":2,"健康":-1},"皆を楽しませた。"))]},
+{title:"雪の日の遊び",text:"珍しく雪が積もり、子供たちがはしゃいでいる。",options:()=>[opt("雪玉を投げ合う","武勇＋／健康－",()=>change({"武勇":2,"健康":-2},"夢中で遊んだ。")),opt("小さな雪像を作る","知略＋／健康－",()=>change({"知略":2,"健康":-1},"形を工夫して作り上げた。"))]},
+{title:"竹とんぼ",text:"職人が竹で作った小さな玩具を見せてくれた。",options:()=>[opt("飛ばし方を競う","武勇＋／健康－",()=>change({"武勇":2,"健康":-1},"何度も飛ばした。")),opt("作り方を教わる","知略＋／財産－",()=>change({"知略":3,"財産":-1},"竹の削り方を覚えた。"))]},
+{title:"蛍を追う夜",text:"夏の水辺に蛍が光っている。",options:()=>[opt("友達を誘って見に行く","魅力＋／健康－",()=>change({"魅力":2,"健康":-1},"皆で光を眺めた。")),opt("蛍の動きを観察する","知略＋／健康－",()=>change({"知略":2,"健康":-1},"小さな光の不思議に見入った。"))]},
+{title:"初めての魚釣り",text:"川辺で年長者が釣り糸を垂らしている。",options:()=>[opt("竿を借りて挑戦する","武勇＋／健康－",()=>change({"武勇":2,"健康":-1},"小魚を釣り上げた。")),opt("魚の集まる場所を探す","知略＋／健康－",()=>change({"知略":2,"健康":-1},"水の流れを読むようになった。"))]},
+{title:"親友との約束",text:"気の合う同年代の子と、また会う約束をした。",options:()=>[opt("互いに秘密を打ち明ける","魅力＋／知略－",()=>change({"魅力":3,"知略":-1},"かけがえのない友ができた。")),opt("一緒に稽古する約束をする","武勇＋／魅力＋／健康－",()=>change({"武勇":2,"魅力":1,"健康":-1},"二人で競い合うようになった。"))]},
+{title:"友達との仲直り",text:"些細なことで親しい子と喧嘩になった。",options:()=>[opt("自分から謝る","魅力＋／武勇－",()=>change({"魅力":3,"武勇":-1},"仲直りできた。")),opt("第三者に仲裁を頼む","知略＋／財産－",()=>change({"知略":2,"財産":-1},"周囲の助けで和解した。"))]},
+{title:"いじめられる子",text:"村の子が年上の子にからかわれている。",options:()=>[opt("間に入って止める","魅力＋／健康－",()=>change({"魅力":3,"健康":-2},"勇気を出して守った。")),opt("大人を呼ぶ","知略＋／武勇－",()=>change({"知略":2,"武勇":-1},"大事になる前に収まった。"))]},
+{title:"秘密の隠れ家",text:"友達が林の中に小さな隠れ家を作ろうと言い出した。",options:()=>[opt("枝を運んで組み立てる","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"隠れ家が完成した。")),opt("見つかりにくい場所を考える","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"巧みな場所を選んだ。"))]},
+{title:"祭りの太鼓",text:"村の祭りで太鼓の音が響いている。",options:()=>[opt("太鼓を打たせてもらう","武勇＋／魅力＋／健康－",()=>change({"武勇":2,"魅力":1,"健康":-1},"祭りを盛り上げた。")),opt("祭りの準備を手伝う","魅力＋／健康－",()=>change({"魅力":3,"健康":-2},"村人に感謝された。"))]},
+{title:"初めての市",text:"賑やかな市には見知らぬ品物が並んでいる。",options:()=>[opt("店主と値段を交渉する","知略＋／魅力＋",()=>change({"知略":2,"魅力":1},"値段の決まり方を学んだ。")),opt("荷運びを手伝う","財産＋／健康－",()=>change({"財産":2,"健康":-2},"わずかな駄賃をもらった。"))]},
+{title:"母の手伝い",text:"家では食事の支度に人手が足りない。",options:()=>[opt("薪を集める","武勇＋／健康－",()=>change({"武勇":2,"健康":-2},"家族に喜ばれた。")),opt("食材を数えて分ける","知略＋／健康－",()=>change({"知略":2,"健康":-1},"無駄なく支度ができた。"))]},
+{title:"父の仕事場",text:"父が仕事の手順を教えてくれるという。",options:()=>[opt("道具を扱ってみる","武勇＋／健康－",()=>change({"武勇":2,"健康":-1},"手先が少し器用になった。")),opt("仕事の段取りを覚える","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"働く大人の工夫を知った。"))]},
+{title:"雨漏りの修理",text:"家の屋根から雨が漏れ始めた。",options:()=>[opt("修理の材料を運ぶ","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"雨漏りが収まった。")),opt("雨の流れを調べる","知略＋／健康－",()=>change({"知略":3,"健康":-1},"原因を見つけた。"))]},
+{title:"初めての田植え",text:"村の田に水が張られ、田植えが始まった。",options:()=>[opt("大人に交じって苗を植える","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"泥だらけで働いた。")),opt("苗の間隔を揃える","知略＋／健康－",()=>change({"知略":2,"健康":-1},"植え方を工夫した。"))]},
+{title:"稲刈りの日",text:"黄金色の稲穂が風に揺れている。",options:()=>[opt("稲束を運ぶ","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"収穫を手伝った。")),opt("刈り取った束を数える","知略＋／健康－",()=>change({"知略":2,"健康":-1},"収穫量を見積もった。"))]},
+{title:"薪拾い",text:"冬に備えて家族が薪を集めている。",options:()=>[opt("山で薪を集める","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"背負い籠がいっぱいになった。")),opt("乾いた薪を選り分ける","知略＋／健康－",()=>change({"知略":2,"健康":-1},"燃えやすい薪を揃えた。"))]},
+{title:"弟妹の世話",text:"幼い子の面倒を見るよう頼まれた。",options:()=>[opt("一緒に遊んであげる","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"子供が笑顔になった。")),opt("寝かしつける工夫をする","知略＋／健康－",()=>change({"知略":2,"健康":-1},"静かに眠ってくれた。"))]},
+{title:"祖母の昔話",text:"年長の親類が昔の戦や飢饉の話を聞かせてくれた。",options:()=>[opt("詳しく質問する","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"昔の出来事を覚えた。")),opt("近所の子にも話して聞かせる","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"話し上手になった。"))]},
+{title:"寺の文字",text:"寺の僧が紙に文字を書いて見せた。",options:()=>[opt("字を真似て書く","知略＋／健康－",()=>change({"知略":3,"健康":-1},"自分の名前を少し書けた。")),opt("読めない字を尋ねる","知略＋／魅力＋",()=>change({"知略":2,"魅力":1},"僧が丁寧に教えてくれた。"))]},
+{title:"寺の鐘",text:"朝、寺の鐘をつく手伝いを頼まれた。",options:()=>[opt("鐘をつく","武勇＋／健康－",()=>change({"武勇":2,"健康":-1},"大きな音が村に響いた。")),opt("時刻を数える","知略＋／武勇－",()=>change({"知略":2,"武勇":-1},"一日の刻限を覚えた。"))]},
+{title:"旅の僧",text:"遠方から来た僧が宿を求めている。",options:()=>[opt("道案内する","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"僧に礼を言われた。")),opt("遠国の話を聞く","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"知らない土地のことを学んだ。"))]},
+{title:"薬草を知る",text:"村の老人が山で採れる薬草を見せてくれた。",options:()=>[opt("一緒に採りに行く","知略＋／健康－",()=>change({"知略":2,"健康":-2},"薬草を覚えた。")),opt("薬草の使い道を聞く","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"手当ての知識を得た。"))]},
+{title:"山の迷い道",text:"友達と歩いた山道で道を見失った。",options:()=>[opt("高い所に登って探す","武勇＋／健康－",()=>change({"武勇":2,"健康":-3},"帰り道を見つけた。")),opt("足跡をたどる","知略＋／健康－",()=>change({"知略":3,"健康":-1},"落ち着いて戻れた。"))]},
+{title:"川で転ぶ",text:"川辺で足を滑らせ、膝を擦りむいた。",options:()=>[opt("痛みをこらえて帰る","武勇＋／健康－",()=>change({"武勇":2,"健康":-4},"何とか家に戻った。")),opt("すぐに手当てを受ける","健康＋／財産－",()=>change({"健康":3,"財産":-1},"傷をきれいにした。"))]},
+{title:"木登りの失敗",text:"高い木の枝で足場が崩れそうになった。",options:()=>[opt("自力で降りる","武勇＋／健康－",()=>change({"武勇":3,"健康":-3},"慎重に地面へ戻った。")),opt("大人を呼んでもらう","健康＋／魅力－",()=>change({"健康":2,"魅力":-1},"助けてもらった。"))]},
+{title:"蜂の巣",text:"庭先の木に蜂の巣が見つかった。",options:()=>[opt("皆を遠ざける","魅力＋／健康－",()=>change({"魅力":2,"健康":-1},"危険を知らせた。")),opt("巣の様子を観察する","知略＋／健康－",()=>change({"知略":2,"健康":-2},"蜂の動きを学んだ。"))]},
+{title:"子犬との出会い",text:"痩せた子犬が家の前をうろついている。",options:()=>[opt("餌を分ける","魅力＋／財産－",()=>change({"魅力":3,"財産":-2},"子犬が懐いた。")),opt("飼い主を探す","知略＋／健康－",()=>change({"知略":2,"健康":-1},"近所を回って尋ねた。"))]},
+{title:"傷ついた鳥",text:"羽を痛めた小鳥が道端に落ちていた。",options:()=>[opt("家で世話をする","魅力＋／財産－",()=>change({"魅力":3,"財産":-1},"小鳥は元気を取り戻した。")),opt("鳥の様子を詳しく見る","知略＋／健康－",()=>change({"知略":2,"健康":-1},"生き物の体を知った。"))]},
+{title:"初めて馬を見る",text:"街道を大きな馬が駆け抜けていった。",options:()=>[opt("馬の世話を手伝う","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"馬に近づく勇気がついた。")),opt("馬具の仕組みを眺める","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"乗馬の道具を覚えた。"))]},
+
+{title:"初めて城を見る",text:"高台から城の石垣と櫓が見えた。",options:()=>[opt("城の周りを歩いてみる","武勇＋／健康－",()=>change({"武勇":2,"健康":-2},"城の大きさを肌で感じた。")),opt("守りの仕組みを考える","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"城の造りに興味を持った。"))]},
+{title:"初めて海を見る",text:"家族と遠出し、見渡す限りの海を目にした。",options:()=>[opt("波打ち際を駆け回る","武勇＋／健康－",()=>change({"武勇":2,"健康":-2},"潮風を浴びて遊んだ。")),opt("船乗りに話を聞く","知略＋／魅力＋",()=>change({"知略":3,"魅力":1},"遠くの国の話を聞いた。"))]},
+{title:"初めて甲冑を見る",text:"武士が甲冑を手入れしている。",options:()=>[opt("重さを試す","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"甲冑の重さに驚いた。")),opt("綴じ紐の作りを調べる","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"防具の仕組みを知った。"))]},
+{title:"武士への憧れ",text:"颯爽と駆ける武士の姿が目に焼き付いた。",options:()=>[opt("木刀で稽古を始める","武勇＋／健康－",()=>change({"武勇":4,"健康":-2},"武士を夢見て稽古した。")),opt("武士の礼法を学ぶ","魅力＋／武勇－",()=>change({"魅力":3,"武勇":-1},"立ち居振る舞いを覚えた。"))]},
+{title:"大名への憧れ",text:"領主の行列を見て、大勢を率いる姿に憧れた。",options:()=>[opt("家臣の役割を調べる","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"人を治める仕組みを知った。")),opt("友達を集めて大将ごっこをする","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"皆の先頭に立った。"))]},
+{title:"南蛮への憧れ",text:"遠い海の向こうから来た品の噂が村に届いた。",options:()=>[opt("異国の品を見に行く","知略＋／財産－",()=>change({"知略":3,"財産":-2},"見知らぬ品に胸が躍った。")),opt("旅商人から話を聞く","魅力＋／知略＋／財産－",()=>change({"魅力":2,"知略":2,"財産":-1},"遠い世界を想像した。"))]},
+{title:"若君との出会い",text:"領主の一族の若君が供を連れて村を通りかかった。",options:()=>[opt("礼を尽くして挨拶する","魅力＋／武勇－",()=>change({"魅力":3,"武勇":-1},"若君に顔を覚えられた。")),opt("若君の武具を観察する","知略＋／健康－",()=>change({"知略":3,"健康":-1},"立派な装備に見入った。"))]},
+{title:"若君との手合わせ",text:"城下で若君が子供たちと木刀を振っている。",options:()=>[opt("手合わせを願い出る","武勇＋／健康－",()=>change({"武勇":4,"健康":-3},"手痛く負けたが経験を得た。")),opt("見学して技を覚える","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"足運びを覚えた。"))]},
+{title:"若君の落とし物",text:"領主の若君が落とした小物を見つけた。",options:()=>[opt("すぐに届ける","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"丁寧な礼を受けた。")),opt("持ち主を確かめてから届ける","知略＋／健康－",()=>change({"知略":3,"健康":-1},"間違いなく持ち主へ返せた。"))]},
+{title:"城下の噂",text:"城下では隣国との争いの噂が広がっている。",options:()=>[opt("大人の話に耳を傾ける","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"世の中の動きを知った。")),opt("不安な友を励ます","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"友達は落ち着いた。"))]},
+{title:"戦帰りの兵",text:"傷を負った兵が村に戻ってきた。",options:()=>[opt("水を運んで世話をする","魅力＋／健康－",()=>change({"魅力":3,"健康":-2},"兵から感謝された。")),opt("戦の話を聞く","知略＋／魅力－",()=>change({"知略":3,"魅力":-1},"戦場の厳しさを知った。"))]},
+{title:"刀鍛冶の火",text:"鍛冶場から赤い火花が散っている。",options:()=>[opt("ふいごを踏む","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"鍛冶の熱さを知った。")),opt("刀の鍛え方を尋ねる","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"金属を鍛える技を学んだ。"))]},
+{title:"弓の稽古を見学",text:"武士たちが的に向けて矢を放っている。",options:()=>[opt("弓を引かせてもらう","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"弓の強さに驚いた。")),opt("射手の姿勢を観察する","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"狙いを定める理屈を知った。"))]},
+{title:"槍持ちの少年",text:"年上の少年が兵の槍を運んでいる。",options:()=>[opt("運搬を手伝う","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"槍の重さを知った。")),opt("少年から奉公の話を聞く","知略＋／魅力＋",()=>change({"知略":2,"魅力":1},"仕官への思いが強まった。"))]},
+{title:"商人の算盤",text:"商人が算盤を弾いて銭を数えている。",options:()=>[opt("数え方を教わる","知略＋／武勇－",()=>change({"知略":4,"武勇":-1},"計算の楽しさを知った。")),opt("店先の呼び込みを手伝う","魅力＋／財産＋",()=>change({"魅力":3,"財産":1},"店が賑わった。"))]},
+{title:"旅芸人の一座",text:"村に旅芸人がやってきて人だかりができた。",options:()=>[opt("芸を真似してみる","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"皆を笑わせた。")),opt("旅の道中を聞く","知略＋／財産－",()=>change({"知略":3,"財産":-1},"知らない国々の話を聞いた。"))]},
+{title:"山伏の法螺貝",text:"山伏が法螺貝を吹きながら村を訪れた。",options:()=>[opt("山道の修行を尋ねる","武勇＋／知略＋",()=>change({"武勇":2,"知略":1},"山での修行に興味を持った。")),opt("山伏を案内する","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"礼を言われた。"))]},
+{title:"書状を読む大人",text:"家に届いた書状を大人たちが読んでいる。",options:()=>[opt("文字を教わる","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"少しずつ読めるようになった。")),opt("書状を届ける役を買う","魅力＋／健康－",()=>change({"魅力":2,"健康":-1},"役に立てた。"))]},
+{title:"雨宿りの旅人",text:"激しい雨に遭った旅人が軒下で困っている。",options:()=>[opt("傘を貸す","魅力＋／財産－",()=>change({"魅力":3,"財産":-1},"旅人が喜んだ。")),opt("安全な道を教える","知略＋／健康－",()=>change({"知略":2,"健康":-1},"旅人を無事に送り出した。"))]},
+{title:"村の井戸",text:"井戸の釣瓶が壊れ、水を汲めなくなった。",options:()=>[opt("縄を引いて直す","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"水が汲めるようになった。")),opt("壊れた仕組みを調べる","知略＋／健康－",()=>change({"知略":3,"健康":-1},"修理の手順が分かった。"))]},
+{title:"干ばつの夏",text:"日照りが続き、村の田が乾き始めた。",options:()=>[opt("水運びを手伝う","武勇＋／健康－",()=>change({"武勇":3,"健康":-3},"田に水を届けた。")),opt("水の分け方を考える","知略＋／魅力－",()=>change({"知略":3,"魅力":-1},"少ない水を工夫して使った。"))]},
+{title:"大雨の橋",text:"大雨で小橋が流され、村人が困っている。",options:()=>[opt("木材を運ぶ","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"橋の修復を助けた。")),opt("安全な渡り道を探す","知略＋／健康－",()=>change({"知略":3,"健康":-1},"回り道を見つけた。"))]},
+{title:"迷子の幼子",text:"市で幼い子が親とはぐれて泣いている。",options:()=>[opt("手を引いて親を探す","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"親子は再会した。")),opt("市の入口で待つよう伝える","知略＋／魅力＋",()=>change({"知略":2,"魅力":1},"無事に親が迎えに来た。"))]},
+{title:"大人の口論",text:"年貢を巡って村の大人たちが言い争っている。",options:()=>[opt("双方の言い分を聞く","知略＋／健康－",()=>change({"知略":3,"健康":-1},"争いの事情を知った。")),opt("仲の良い大人に知らせる","魅力＋／知略＋",()=>change({"魅力":2,"知略":1},"口論は収まった。"))]},
+{title:"奉公に出る友",text:"親しい友が遠くの家に奉公することになった。",options:()=>[opt("餞別を渡す","魅力＋／財産－",()=>change({"魅力":3,"財産":-2},"友は喜んだ。")),opt("再会の約束をする","魅力＋／知略＋",()=>change({"魅力":2,"知略":1},"互いの将来を語った。"))]},
+{title:"村を去る武士",text:"主家を失った武士が村を通り過ぎていく。",options:()=>[opt("武士に話しかける","知略＋／健康－",()=>change({"知略":3,"健康":-1},"浪人の暮らしを知った。")),opt("水と食べ物を分ける","魅力＋／財産－",()=>change({"魅力":3,"財産":-2},"武士は深く礼をした。"))]},
+{title:"剣術の師匠",text:"旅の武芸者が子供にも木刀を握らせてくれた。",options:()=>[opt("一太刀教わる","武勇＋／健康－",()=>change({"武勇":4,"健康":-3},"腕が痺れるまで稽古した。")),opt("師匠の話を聞く","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"剣の心構えを学んだ。"))]},
+{title:"将棋の勝負",text:"年長者が盤上で駒を動かしている。",options:()=>[opt("対局に挑む","知略＋／健康－",()=>change({"知略":4,"健康":-1},"負けたが先を読む楽しさを知った。")),opt("友達に駒の動きを教える","魅力＋／知略＋",()=>change({"魅力":3,"知略":1},"皆で盤を囲んだ。"))]},
+{title:"絵師の筆",text:"旅の絵師が山並みを描いている。",options:()=>[opt("筆の使い方を教わる","知略＋／財産－",()=>change({"知略":3,"財産":-1},"絵を描く楽しさを覚えた。")),opt("絵師に道案内する","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"絵師と親しくなった。"))]},
+{title:"初めての船旅",text:"家族と川船に乗る機会が訪れた。",options:()=>[opt("船頭の仕事を手伝う","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"櫂の重さを知った。")),opt("川の流れを眺める","知略＋／健康－",()=>change({"知略":3,"健康":-1},"水路の仕組みに興味を持った。"))]},
+{title:"星空の下で",text:"夜空に無数の星が輝いている。",options:()=>[opt("星の位置を覚える","知略＋／健康－",()=>change({"知略":3,"健康":-1},"方角を知る手掛かりを覚えた。")),opt("友達と将来を語る","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"夢を分かち合った。"))]},
+{title:"初めての花見",text:"春の桜が咲き、村人が集まっている。",options:()=>[opt("友達を誘う","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"賑やかな一日になった。")),opt("花の移り変わりを観察する","知略＋／健康＋",()=>change({"知略":2,"健康":1},"季節の巡りを感じた。"))]},
+{title:"初めての収穫祝い",text:"豊作を祝って村に料理が振る舞われた。",options:()=>[opt("配膳を手伝う","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"皆に感謝された。")),opt("収穫量を尋ねる","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"村の暮らしを学んだ。"))]},
+{title:"古い地図",text:"大人が古い国絵図を広げている。",options:()=>[opt("故郷の位置を探す","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"周囲の国の位置を知った。")),opt("行きたい国を語る","魅力＋／知略＋",()=>change({"魅力":2,"知略":1},"旅への憧れが芽生えた。"))]},
+{title:"遠国からの使者",text:"珍しい服装の使者が街道を通った。",options:()=>[opt("使者の言葉に耳を傾ける","知略＋／健康－",()=>change({"知略":3,"健康":-1},"異なる言葉遣いを知った。")),opt("道を教える","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"礼を言われた。"))]},
+{title:"子供たちの相撲",text:"祭りの余興で子供相撲が開かれた。",options:()=>[opt("土俵に上がる","武勇＋／健康－",()=>change({"武勇":4,"健康":-3},"全力で組み合った。")),opt("行司役を務める","魅力＋／知略＋",()=>change({"魅力":3,"知略":1},"皆が納得する勝負になった。"))]},
+{title:"竹林の探検",text:"村外れの竹林に小道が続いている。",options:()=>[opt("奥まで進む","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"新しい景色を見つけた。")),opt("道標を作る","知略＋／健康－",()=>change({"知略":3,"健康":-1},"帰り道に迷わず済んだ。"))]},
+{title:"狐の噂",text:"夜の社で狐火を見たという噂が広まった。",options:()=>[opt("友達と確かめに行く","武勇＋／健康－",()=>change({"武勇":2,"健康":-2},"噂の正体は分からなかった。")),opt("噂の出所を調べる","知略＋／魅力－",()=>change({"知略":3,"魅力":-1},"話が大げさになっていたと知った。"))]},
+{title:"祖父の形見",text:"家族が古い道具を見せ、先祖の話をしてくれた。",options:()=>[opt("使い方を教わる","知略＋／武勇－",()=>change({"知略":3,"武勇":-1},"昔の暮らしを知った。")),opt("大切に手入れする","魅力＋／健康－",()=>change({"魅力":2,"健康":-1},"家族に褒められた。"))]},
+{title:"隣村の子供",text:"隣村の子らが遊びに来て、互いに様子をうかがっている。",options:()=>[opt("一緒に遊ぼうと誘う","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"新しい友達ができた。")),opt("遊びの勝負を申し込む","武勇＋／健康－",()=>change({"武勇":3,"健康":-2},"村を越えた競争を楽しんだ。"))]},
+{title:"子供の小さな商い",text:"友達が拾った木の実を市で売ろうと言い出した。",options:()=>[opt("売り方を工夫する","知略＋／財産＋",()=>change({"知略":3,"財産":1},"少し銭を得た。")),opt("呼び込みをする","魅力＋／財産＋",()=>change({"魅力":3,"財産":1},"買い手が集まった。"))]},
+{title:"火事の知らせ",text:"近くの家から煙が上がり、村人が駆けつけた。",options:()=>[opt("水桶を運ぶ","武勇＋／健康－",()=>change({"武勇":3,"健康":-3},"消火を手伝った。")),opt("幼い子を安全な場所へ導く","魅力＋／健康－",()=>change({"魅力":3,"健康":-2},"子供たちは無事だった。"))]},
+{title:"冬の風邪",text:"冷たい風が続き、あなたは咳をし始めた。",options:()=>[opt("暖かくして休む","健康＋／武勇－／知略－",()=>change({"健康":5,"武勇":-2,"知略":-2},"体調が戻った。")),opt("家の手伝いを続ける","財産＋／健康－",()=>change({"財産":2,"健康":-4},"仕事は進んだが疲れが残った。"))]},
+{title:"旅立ちへの憧れ",text:"遠い国へ向かう旅人を見送り、胸が高鳴った。",options:()=>[opt("旅の準備を考える","知略＋／財産－",()=>change({"知略":3,"財産":-1},"必要な物を学んだ。")),opt("家族に将来の夢を話す","魅力＋／健康－",()=>change({"魅力":3,"健康":-1},"夢を語り合った。"))]}
+];
+function child(){
+ if(s.age<=5){
+  if(R(1,100)<=(s.body==='病弱'?24:8))return scene('幼い日の病','熱が続き、家族はあなたの身を案じている。',[opt('家の蓄えを使って手当てを受ける','財産－6／健康回復の機会',()=>{mod('財産',-6);return risk(s.body==='病弱'?13:3,'幼い日の病で亡くなった。')?'家族の看病もむなしく、病に倒れた。':change({健康:R(2,7)},'熱が下がり、回復へ向かった。')},()=>s.stats.財産>=6),opt('家で静養する','健康低下の可能性',()=>risk(s.body==='病弱'?25:7,'幼い日の病で亡くなった。')?'病に勝てなかった。':change({健康:-R(3,9)},'しばらく寝込んだが、命は取り留めた。'))]);
+  const infantMoments=['家族に抱かれて初めて笑った。','初めて自分の足で歩いた。','家の庭先で草花に触れた。','初めて言葉を覚え、家族を喜ばせた。','近所の子の遊びを眺めた。','父母の働く姿を見て過ごした。','初めての祭りで太鼓の音に驚いた。','雨音を聞きながら家族と過ごした。','初めての雪に手を伸ばした。','庭に来た小鳥を追いかけた。'];
+  if(!s.childhoodSeen)s.childhoodSeen=[];
+  let unseen=infantMoments.filter(x=>!s.childhoodSeen.includes(x));let moment=P(unseen.length?unseen:infantMoments);s.childhoodSeen.push(moment);
+  return {title:'幼い日々',text:moment,options:[],autoInfant:true};
+ }
+ if(!s.childhoodSeen)s.childhoodSeen=[];
+ // 幼少期は各イベントを原則一生に一度だけ発生させる。
+ let available=childhoodEvents.filter(x=>!s.childhoodSeen.includes(x.title));
+ if(!available.length){s.childhoodSeen=[];available=childhoodEvents}
+ let item=P(available);s.childhoodSeen.push(item.title);
+ return scene(item.title,item.text,item.options());
+}
+function civilianLevy(){
+ const merchant=['小商人','商家の当主','豪商','御用商人'].includes(s.rank);
+ const origin=merchant?'商いを営む町':'暮らしている村';
+ return scene('領主からの軍役動員',s.local+'の領内で戦が起こり、'+origin+'にも軍役が命じられた。家臣として仕官するわけではないが、戦場での働きや兵糧の輸送を求められている。',[
+  opt('臨時の兵として戦場へ出る','武勇・健康に影響／討死の危険／身分は変わらない',()=>{
+   s.seen.firstBattle=true;s.lastBattleAge=s.age;
+   if(risk(Math.max(4,18-Math.floor(s.stats.武勇/15)),'軍役に動員された戦場で討死した。'))return '領主の命で臨時の兵として出陣したが、敵の攻撃を受けて討死した。';
+   mod('健康',-R(3,9));mod('武勇',R(1,4));
+   return '臨時の兵として戦場に立ち、どうにか生還した。戦が終わると軍役を解かれ、'+(merchant?'商い':'田畑')+'に戻った。正式な家臣になったわけではない。';
+  }),
+  opt('兵糧や武具の運搬を引き受ける','健康－／財産＋／身分は変わらない',()=>{
+   mod('健康',-R(2,6));mod('財産',R(1,4));
+   return '軍勢の荷駄を運び、補給を支えた。任務を終えると'+(merchant?'商い':'田畑')+'に戻った。';
+  }),
+  opt('金品を納め、軍役の免除を願う','財産－／戦場には出ない',()=>{
+   mod('財産',-R(5,10));return '軍役の代わりに金品を差し出し、戦場へ向かわずに済んだ。';
+  })
+ ]);
+}
+// 強制の軍役は civilianLevy に統一。志願の足軽募集とは区別する。
+function recruitment(){
+ if(R(1,100)<=22)return civilianLevy();
+ const first=!s.seen.firstBattle;
+ return scene(first?'初陣への道 ― 足軽の募集':'足軽の募集',s.local+'が兵を募っている。戦場で手柄を立てれば、武士として召し抱えられる道も開ける。',[
+  opt(first?'初陣に出る':'戦場へ向かう','出陣後は指揮官から任務を命じられる',()=>{s.clan=s.clan||s.local;if(!s.rank||['百姓','商家','商人','下級武家','有力武家','浪人'].includes(s.rank))s.rank='足軽';s.pendingBattle=true;return '兵として軍勢に加わった。戦場での役割は指揮官が決める。'}),
+  opt('今は家業に専念する','財産・健康を守りやすい',()=>reward('財産',2,'家業を続け、生活を守った。')),
+  opt('伝手を頼って奉公口を探す','知略・魅力が高いほど有利',()=>{let p=15+Math.floor((s.stats.知略+s.stats.魅力)/4);if(R(1,100)<=p){s.clan=s.local;s.rank='足軽';return reward('財産',5,'紹介を受け、'+s.local+'に仕えることとなった。')}return '奉公先は見つからず、今は家業に戻った。'})
+ ])
+}
+function battleOutcome(first=false,style='guard'){s.lastBattleAge=s.age;first=first||!s.seen.firstBattle;s.seen.firstBattle=true;let b=s.stats.武勇,z=s.stats.知略,m=s.stats.魅力;// 後方支援・負傷者保護は消耗による健康低下を発生させない。
+let wear=(style==='support'||style==='rest')?0:strain(style==='assault'?2:style==='retreat'?0:1);if(!s.alive)return '戦場で負った傷が重なり、命を落とした。';let tide=R(1,100)+(z-40)*.12;let state=tide>=78?'優勢':tide>=34?'互角':'劣勢';let shift=state==='優勢'?-3:state==='劣勢'?5:0;let base=style==='assault'?25:style==='tactic'?18:style==='guard'?11:style==='support'?10:style==='retreat'?7:15;let danger=Math.max(1,base+shift-Math.floor(b/30)-Math.floor(z/45))+(s.age>=60?8:0)+(s.stats.健康<35?9:0);if(risk(danger,'合戦で討死した。'))return '自軍は'+state+'だった。敵兵の攻撃を受け、戦場で命を落とした。';let lead='自軍は'+state+'だった。';if(style==='retreat'){mod('武勇',-R(1,3));s.trust-=R(3,8);if(R(1,100)<=35){mod('財産',-R(3,7));return lead+(s.rank==='大名'?'軍を退かせた判断に家臣が動揺し、兵糧と威信を失った。': ['家臣','重臣','家中筆頭'].includes(s.rank)?'退却の判断が軍議で問題となり、家中の信頼を失った。':'危険を避けて退いたが、命令違反を咎められ、処分を受けた。');}return lead+(s.rank==='大名'?'軍を退かせて命を守ったが、家臣の士気は下がった。':'戦場から退いて命を守った。しかし周囲の評価と主君の信頼は下がった。');}if(style==='support'||style==='rest'){mod('魅力',R(2,5));s.trust+=R(1,3);return lead+(style==='rest'?'後方で兵を休ませ、負傷者を保護した。周囲からの信頼を得た。':'仲間を援護し、隊の損害を抑えた。周囲からの信頼を得た。');}if(style==='guard'){mod('魅力',R(1,3));if(state==='劣勢')mod('健康',-R(1,4));return lead+(['大名','家中筆頭','重臣','家臣'].includes(s.rank)?'配下に守備を命じ、隊列を維持した。大きな武功はないが、軍の損害を抑えた。':'命令に従って隊列を守り、持ち場を保った。大きな武功はないが、任務を果たした。');}if(style==='tactic'){
+ // 合戦の策は必ず知略で判定。知略0～5では成功しない。
+ const ability=s.stats.知略;
+ const chance=ability<=5?0:Math.max(2,Math.min(94,Math.round((ability-5)*.82+(state==='優勢'?5:state==='劣勢'?-8:0))+(ability>=50?21+Math.floor((ability-50)/5):0)));
+ if(R(1,100)<=chance){
+  mod('知略',R(2,4));mod('武勇',-R(1,3));s.trust+=3;s.merit+=2;
+  return lead+'【策略成功／知略'+ability+'・成功率'+chance+'％】敵の動きを読み切り、兵を動かして戦況を有利に導いた。武功も認められた。';
+ }
+ mod('知略',-R(1,3));mod('健康',-R(2,5));s.trust=Math.max(0,s.trust-3);
+ return lead+'【策略失敗／知略'+ability+'・成功率'+chance+'％】敵の動きを読み違え、部隊が混乱した。作戦は失敗し、負傷者を出して主君の信頼も損なった。';
+ }mod('武勇',R(3,7));mod('知略',-R(1,3));let success=R(1,100)+b*.45+z*.15+(state==='優勢'?15:state==='劣勢'?-12:0);if(success>=75){s.merit+=4;mod('財産',R(4,9));s.trust+=7;const greatFeat=exceptionalHeadFeat();if(greatFeat)return lead+greatFeat;if(s.rank==='足軽'&&s.merit>=4)s.rank='足軽大将';else if(s.rank==='足軽大将'&&s.merit>=6)s.rank='家臣';return lead+'敵の隙を突いて手柄を立て、恩賞を受けた。'}if(success>=42){s.merit+=2;s.trust+=2;return lead+'積極的に戦い、小さな手柄を立てた。'}mod('健康',-R(2,6));return lead+'攻めかかったが敵に押し返され、負傷して退いた。'}
+// 個人の戦功とは別に軍全体の勝敗を判定する。足軽・足軽大将の行動は勝率に影響しない。
+function decideArmyResult(rank,style,personalResult){
+ const commander=['家臣','重臣','家中筆頭','大名'].includes(rank);
+ const tacticSuccess=personalResult.includes('【策略成功');
+ const tacticFailure=personalResult.includes('【策略失敗');
+ // 下級兵の行動とは無関係な戦況。指揮官の作戦だけ勝率に影響する。
+ let winChance=55;
+ if(commander){
+  if(style==='tactic')winChance+=tacticSuccess?24:tacticFailure?-27:0;
+  else if(style==='assault')winChance+=7;
+  else if(style==='guard')winChance+=3;
+  else if(style==='support')winChance+=2;
+ }
+ winChance=Math.max(12,Math.min(90,winChance));
+ const victory=R(1,100)<=winChance;
+ s.lastArmyResult=victory?'勝利':'敗北';
+ s.armyWins=(s.armyWins||0)+(victory?1:0);
+ s.armyLosses=(s.armyLosses||0)+(victory?0:1);
+ let detail=victory?'【合戦結果：勝利】自軍は敵軍を退け、この戦いに勝利した。':'【合戦結果：敗北】自軍は敗れ、退却を余儀なくされた。';
+ if(!victory&&commander&&s.alive){
+  // 指揮官だけが敗戦責任を問われる。策略失敗なら危険が増す。
+  const executionChance=style==='tactic'&&tacticFailure?23:style==='assault'?13:8;
+  if(R(1,100)<=executionChance){
+   s.alive=false;s.cause='敗戦の責任を問われ、打首となった。';
+   detail+=' 作戦・指揮の責任を追及され、主君の命により打首となった。';
+  }else if(R(1,100)<=40){
+   s.trust=Math.max(0,s.trust-R(3,8));
+   detail+=' 指揮の責任を問われ、主君から厳しく叱責された。';
+  }else detail+=' 敗戦の責任を問われたが、処刑は免れた。';
+  // 従来の打首抽選を維持。生存した指揮官に限り、別途切腹命令が下る場合がある。
+  if(s.alive&&!s.pendingDefeatDecision&&s.rank!=='大名'&&R(1,100)<=12){
+   s.pendingDefeatDecision={type:'seppuku',clan:s.clan,rank:s.rank};
+   detail+=' さらに主君から切腹を命じる使者が訪れた。';
+  }
+ }
+ // 大敗時の自害イベント。指揮官の敗戦責任とは独立した確率判定。
+ if(!victory&&s.alive&&!s.pendingDefeatDecision&&R(1,100)<=12){
+  s.pendingDefeatDecision={type:'lastStand',castle:false,clan:s.clan,rank:s.rank};
+  detail+=' 味方の崩壊が激しく、敵の追撃に包囲されかけた。';
+ }
+ return detail;
+}
+// 大名の家名と従属先は別々に保持する。独立大名は主君を持たない。
+function daimyoStatus(){return s.rank==='大名'?(s.independent===false&&s.overlord?'従属大名（'+s.overlord+'に従属）':'独立大名'):s.rank;}
+function militaryAllegiance(){return s.rank==='大名'&&!s.independent&&s.overlord?s.overlord:s.clan;}
+function becomeDaimyo(castle,route,subordinate=false){
+ const formerLord=s.clan;
+ clearHousePower();
+ s.rank='大名';s.castle=castle;s.independent=!subordinate;
+ s.overlord=subordinate?formerLord:null;
+ s.clan=familyName(s.name)+'家';
+ if(!subordinate)s.trust=0;
+ if(!Array.isArray(s.achievements))s.achievements=[];
+ const relationship=subordinate?'旧主家'+formerLord+'に従属する':'独立した';
+ s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'大名',summary:route+'により'+castle+'を得て、'+relationship+'大名となった'});
+ note(castle+'を本拠とする'+s.clan+'を興し、'+relationship+'大名となった。');
+ return castle+'を得て、'+(subordinate?formerLord+'に従属する大名として、自らの家臣と領地を治めることとなった。':'独立大名として自らの旗を掲げ、領国を治めることとなった。');
+}
+function daimyoIndependenceScene(){
+ const lord=s.overlord;
+ return scene('従属からの独立 ― 自家の旗',
+ lord+'に仕える大名として城と領地を治めてきた。家臣たちから「いまこそ独立を」との声が上がる。一方、主君との主従関係を断てば、これまでの恩義も揺らぐ。'+hostageRebellionWarning(),[
+  opt('主君と交渉し、独立を認めてもらう','知略・魅力で判定／失敗すると信頼低下',()=>{
+   const c=Math.min(90,Math.round((daimyoChance('知略',8)+daimyoChance('魅力',8))/2));
+   if(R(1,100)<=c){mod('知略',R(2,4));return '【成功・'+c+'％】'+completeDaimyoIndependence('主君との交渉による独立')+releaseHostage();}
+   s.trust=Math.max(0,(s.trust||0)-R(4,8));return '【失敗・'+c+'％】'+lord+'は独立を認めなかった。主君との信頼が損なわれた。';
+  }),
+  opt('家臣を集めて独立を宣言する','武勇・魅力で判定／人質処刑の危険／失敗すると健康・信頼低下',()=>{const hostageFate=resolveHostageRebellion();
+   const c=Math.min(85,Math.round((daimyoChance('武勇',18)+daimyoChance('魅力',16))/2));
+   if(R(1,100)<=c){mod('武勇',R(2,4));return '【成功・'+c+'％】'+completeDaimyoIndependence('家臣の支持を得て独立')+hostageFate;}
+   mod('健康',-R(2,5));s.trust=Math.max(0,(s.trust||0)-R(6,12));return '【失敗・'+c+'％】独立を宣言したが家臣の支持が足りず、'+lord+'への従属を続けることになった。'+hostageFate;
+  }),
+  opt('今は主君との関係を守る','信頼上昇／従属を維持',()=>{s.trust+=R(2,4);return lord+'への忠義を保ち、従属大名として領国を治め続けた。';})
+ ]);
+}
+function completeDaimyoIndependence(reason){
+ const former=s.overlord;
+ s.independent=true;s.overlord=null;s.trust=0;
+ if(!Array.isArray(s.achievements))s.achievements=[];
+ s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'独立',summary:former+'の従属を離れ、'+reason});
+ note(former+'との主従関係を解消し、独立大名となった。');
+ return former+'から独立を果たした。これより自家の判断で領国と軍勢を動かす。';
+}
+function daimyoChance(skill,difficulty){
+ const v=s.stats[skill]||0;
+ if(v<=5)return 0;
+ return Math.max(5,Math.min(93,Math.round(25+v*.65-difficulty)));
+}
+function independenceEvent(){
+ const oldClan=s.clan||'旧主家';
+ const castle=(s.region||'近隣')+'城';
+ const mode=P(['grant','collapse','revolt']);
+ if(mode==='grant')return scene('独立の好機 ― 城と領地の下賜',oldClan+'の主君が、功績ある重臣に城と領地を預けると告げた。独立した領主として認められるには、家中の支持が必要となる。',[
+  opt('これまでの功績を示し、城主への取り立てを願う','魅力・武功が重要／失敗すると信頼低下',()=>{let c=Math.min(90,daimyoChance('魅力',8)+Math.min(18,Math.floor((s.merit||0)/2)));if(R(1,100)<=c){mod('魅力',R(2,4));return '【成功・'+c+'％】'+becomeDaimyo(castle,'主君の下賜',true)}s.trust=Math.max(0,s.trust-4);mod('魅力',-R(2,4));return '【失敗・'+c+'％】主君は時期尚早として願いを退けた。家中での立場も弱まった。'}),
+  opt('領地を望まず、引き続き重臣として仕える','信頼＋／独立は見送る',()=>{s.trust+=3;return '城主となる機会を辞退し、引き続き主家を支える道を選んだ。'}),
+  opt('有力家臣に働きかけ、推挙を取り付ける','知略・財産が重要／失敗すると評判低下',()=>{mod('財産',-R(3,7));let c=daimyoChance('知略',10);if(R(1,100)<=c)return '【成功・'+c+'％】'+becomeDaimyo(castle,'家中の推挙',true);s.trust=Math.max(0,s.trust-3);return '【失敗・'+c+'％】根回しは実らず、推挙を得られなかった。'})]);
+ if(mode==='collapse')return scene('独立の好機 ― 主家の動揺',oldClan+'が大敗し、領内の諸城が動揺している。'+castle+'の守備隊は、誰の命令に従うべきか迷っている。',[
+  opt('城内の家臣を説得し、城を掌握する','知略・魅力が重要／失敗すると浪人になる恐れ',()=>{let c=daimyoChance('知略',7);if(R(1,100)<=c)return '【成功・'+c+'％】'+becomeDaimyo(castle,'主家滅亡の混乱');mod('知略',-R(2,4));s.trust=Math.max(0,s.trust-5);return '【失敗・'+c+'％】守備隊をまとめきれず、城の掌握に失敗した。'}),
+  opt('残った主家の者を守り、再興を目指す','魅力＋／独立は見送る',()=>change({魅力:R(2,4),財産:-R(2,4)},'混乱の中でも主家への忠義を守った。')),
+  opt('兵を率いて城を強襲する','武勇が重要／失敗すると討死の危険',()=>{let c=daimyoChance('武勇',16);mod('健康',-R(4,9));if(R(1,100)<=c)return '【成功・'+c+'％】'+becomeDaimyo(castle,'城の攻略');if(R(1,100)<=25){s.alive=false;s.cause='独立を目指した城攻めで討死した。';return '【失敗・'+c+'％】城攻めは失敗し、敵兵の反撃を受けて命を落とした。'}return '【失敗・'+c+'％】城門を破れず、兵を失って撤退した。'})]);
+ return scene('独立の好機 ― 下剋上',oldClan+'の主君と家臣の対立が深まり、あなたを新たな領主に推す者が現れた。だが、挙兵は反逆にほかならない。'+hostageRebellionWarning(),[
+  opt('味方を募り、主君の城を奪う','知略・武勇が重要／人質処刑の危険／失敗すれば打首の危険',()=>{const hostageFate=resolveHostageRebellion();let c=Math.min(92,Math.round((daimyoChance('知略',16)+daimyoChance('武勇',16))/2));mod('健康',-R(3,7));if(R(1,100)<=c)return '【成功・'+c+'％】'+becomeDaimyo(castle,'下剋上')+hostageFate;if(R(1,100)<=55){s.alive=false;s.cause='謀反が失敗し、主君の命により打首となった。';return '【失敗・'+c+'％】謀反は鎮圧され、捕縛ののち打首となった。'+hostageFate}markFailedRebellion(oldClan,'下剋上',s.rank);s.previousService={clan:oldClan,rank:s.rank,year:birthYear()+s.age,reason:'下剋上失敗'};s.rank='浪人';s.clan=null;return '【失敗・'+c+'％】謀反に敗れ、辛うじて逃れたが主家を追われ浪人となった。'+hostageFate}),
+  opt('挙兵せず、主君への忠義を貫く','信頼＋／独立は見送る',()=>{s.trust+=4;return '反乱への誘いを退け、主家への忠義を守った。'}),
+  opt('主君に退位を迫り、無血開城を図る','知略・魅力が重要／失敗すると処罰',()=>{let c=daimyoChance('知略',21);if(R(1,100)<=c)return '【成功・'+c+'％】'+becomeDaimyo(castle,'無血開城');s.trust=Math.max(0,s.trust-8);mod('魅力',-R(2,5));return '【失敗・'+c+'％】主君は要求を拒み、家中での立場を失った。'})]);
+}
+function castleGovernance(){
+ let castle=s.castle||'本城';
+ return scene('城主の政務 ― '+castle,castle+'を本拠として、領地と家臣を治める。城主としての判断が領国の行方を左右する。',[
+  opt('城と城下町の整備を進める','財産－／魅力＋／知略＋',()=>change({財産:-R(4,8),魅力:R(2,4),知略:R(1,3)},'城下の道と市場を整え、領民の暮らしを支えた。')),
+  opt('家臣の武具と城の守りを強化する','財産－／武勇＋',()=>change({財産:-R(3,6),武勇:R(2,4)},'城門と兵の備えを改め、守りを固めた。')),
+  opt('年貢と用水の仕組みを見直す','知略で成否判定／失敗すると財産－',()=>{let c=daimyoChance('知略',9);if(R(1,100)<=c)return '【成功・'+c+'％】'+change({知略:R(2,4),財産:R(2,5)},'領内の収穫と税収が安定した。');return '【失敗・'+c+'％】'+change({知略:-R(1,3),財産:-R(3,6)},'改革が混乱を招き、領内に不満が広がった。')}),
+  opt('城内で休養し、傷を養生する','健康＋6〜12／武勇・知略－／財産－',()=>change({健康:R(6,12),武勇:-R(3,5),知略:-R(3,5),財産:-R(1,2)},'城で療養し体力を取り戻した。'))]);
+}
+function soldier(){
+ if(s.rank==='家中筆頭'&&!s.independent&&R(1,100)<=34)return houseUsurpationScene();
+ if(s.rank==='重臣'&&!s.independent&&s.age>=30&&s.merit>=12&&R(1,100)<=28)return independenceEvent();
+ if(s.rank==='大名'&&!s.independent&&s.overlord&&R(1,100)<=16)return daimyoIndependenceScene();
+ if(s.rank==='大名'&&s.castle&&R(1,100)<=40)return castleGovernance();
+ let warChance=(typeof s.lastBattleAge==='number'&&s.age-s.lastBattleAge<=1)?24:46;
+ let war=s.pendingBattle||R(1,100)<=warChance;
+ if(war){
+  s.pendingBattle=false;
+  let first=!s.seen.firstBattle;
+  let rank=s.rank||'足軽',leader=['足軽大将','家臣','重臣','家中筆頭','大名'].includes(rank),senior=['重臣','家中筆頭','大名'].includes(rank);
+  // 初陣は必ず通常の野戦。以後は戦況・戦術が異なる合戦を選ぶ。
+  const types=[
+   {id:'field',name:'野戦',intro:'両軍は平野に陣を敷き、正面から対峙している。旗指物が風になびき、法螺貝が鳴った。',low:[['槍を揃えて前線を守る','guard'],['敵の陣へ斬り込む','assault'],['隣の組を援護する','support'],['機を見て後退する','retreat']],mid:[['陣形を整えて迎撃する','guard'],['隊を率いて突撃する','assault'],['側面へ兵を回す','tactic'],['負傷兵を救い出す','support']],high:[['全軍の守備を固める','guard'],['先鋒を率いて攻める','assault'],['敵の弱点を見抜き兵を動かす','tactic'],['後詰と退路を確保する','support']]},
+   {id:'siege_def',name:'籠城戦',intro:'敵の大軍が城を包囲した。城門の外では攻城兵が迫り、城内には緊張が走っている。',low:[['城門を死守する','guard'],['城壁から敵を撃退する','assault'],['負傷者と矢弾の運搬を助ける','support'],['危険な持ち場から退く','retreat']],mid:[['城門の守りを強める','guard'],['出丸から打って出る','assault'],['敵の攻め口を読んで兵を移す','tactic'],['城内の負傷兵を保護する','support']],high:[['徹底抗戦を命じる','guard'],['城門を開いて逆襲する','assault'],['敵の攻城計画を見抜き防御を組み直す','tactic'],['兵糧と城内の秩序を維持する','support']]},
+   {id:'siege_atk',name:'攻城戦',intro:'敵城の堀と高い塀が行く手を阻む。味方は梯子と盾を用意し、攻城の機をうかがっている。',low:[['盾の陰から城門へ進む','guard'],['梯子をかけて城壁を登る','assault'],['矢弾や梯子を運ぶ','support'],['敵の反撃を避けて退く','retreat']],mid:[['攻城隊の隊列を保つ','guard'],['先陣を切って城門に迫る','assault'],['守備の薄い場所を探る','tactic'],['後続の攻城兵を支える','support']],high:[['包囲を固めて攻撃を急がない','guard'],['総攻撃の先頭に立つ','assault'],['搦手から城を崩す策を立てる','tactic'],['負傷兵と補給路を守る','support']]},
+   {id:'starve',name:'兵糧攻め',intro:'敵城を囲んで幾日も経つ。敵の食糧は尽きつつあるが、味方にも疲れと焦りが広がっている。',low:[['包囲線の持ち場を守る','guard'],['敵の補給隊を襲う','assault'],['味方へ兵糧を運ぶ','support'],['夜陰に紛れて持ち場を離れる','retreat']],mid:[['包囲線の穴を塞ぐ','guard'],['敵の兵糧搬入路を断つ','assault'],['敵の脱出経路を推し量る','tactic'],['疲弊した兵を交代させる','support']],high:[['包囲を続けて降伏を待つ','guard'],['敵の兵糧蔵を奪う','assault'],['降伏条件を示して開城を促す','tactic'],['味方の補給を立て直す','support']]},
+   {id:'ambush',name:'奇襲戦',intro:'山道を進む敵軍に気づかれぬよう、味方は林に身を伏せた。合図ひとつで戦況が大きく動く。',low:[['伏兵の位置を守る','guard'],['合図とともに敵へ飛びかかる','assault'],['退路を塞ぐ仲間を助ける','support'],['敵に気づかれる前に退く','retreat']],mid:[['兵を伏せて合図を待つ','guard'],['先頭で敵の隊列を崩す','assault'],['敵の進路を読んで伏兵を動かす','tactic'],['仲間の退路を守る','support']],high:[['伏兵を動かさず好機を待つ','guard'],['全隊を率いて一気に襲う','assault'],['敵の後背へ別働隊を回す','tactic'],['退却路と連絡役を確保する','support']]},
+   {id:'night',name:'夜襲戦',intro:'月明かりも乏しい夜、敵の陣から篝火が見える。物音を立てれば、夜襲は失敗に終わるだろう。',low:[['隊列を崩さず静かに進む','guard'],['敵陣の奥へ突入する','assault'],['味方の道案内と援護をする','support'],['混乱に紛れて退く','retreat']],mid:[['部下に静粛を徹底させる','guard'],['敵の本陣へ切り込む','assault'],['篝火の位置から敵の配置を読む','tactic'],['迷った兵を集めて守る','support']],high:[['夜明けまで慎重に待機する','guard'],['敵本陣への夜襲を指揮する','assault'],['陽動で敵の注意をそらす','tactic'],['混乱に備え退路を確保する','support']]}
+  ];
+  let recent=s.recentBattleTypes||[];
+  let candidates=types.filter(x=>!recent.includes(x.id));
+  if(!candidates.length)candidates=types;
+  let battle=first?types[0]:P(candidates);
+  s.recentBattleTypes=[...recent,battle.id].slice(-3);
+  let title=first?'【初陣】野戦':'合戦 ― '+battle.name;
+  let options=senior?battle.high:leader?battle.mid:battle.low;
+  let intro=first?(s.warriorFirstBattle?'これがあなたの初陣である。父と叔父も同じ軍勢に加わり、二人の指揮を補佐する役目を任された。幼い頃から武家の務めを教わってきたが、初めての戦場を前に緊張で胸が高鳴る。父は「落ち着いて周りを見よ」と声を掛けた。':'これがあなたの初陣である。'):('今回の戦は'+battle.name+'となった。');
+  let role=first&&s.warriorFirstBattle&&!senior&&!leader?'足軽大将として小勢を預かり、父と伯父の助力にあたる。戦の勝敗を左右する大将ではないが、兵をまとめる責任がある。':senior?'軍議に列し、配下の軍勢へ指示を下す立場にある。':leader?'配下の兵を率い、自ら隊の動きを判断する。':'あなたは一兵卒として命令を受け、持ち場に就いた。';
+  if(first&&s.warriorFirstBattle&&!senior&&!leader)options=[['父の隊列を守り、兵をまとめる','guard'],['伯父の命を受けて先陣を援護する','assault'],['敵の動きを読み、父に進言する','tactic'],['父と伯父の兵を助け、後方を支える','support']];
+  let desc={guard:'守備を優先／手柄は控えめ',assault:'手柄を得やすい／討死の危険が高い',tactic:'知略を生かして戦況に対応',support:'仲間を援護／信頼を得やすい',retreat:'生存を優先／処分や評価低下の可能性'};
+  return scene(title,intro+battle.intro+role,options.map(([label,style])=>opt(label,desc[style],()=>{
+    let result=battleOutcome(first,style);
+    // 討死した場合も戦の勝敗は記録するが、打首判定は行わない。
+    let armyResult=decideArmyResult(rank,style,result);
+    if(s.alive&&s.lastArmyResult==='敗北'&&battle.id==='siege_def'&&!s.pendingDefeatDecision&&R(1,100)<=30){
+     s.pendingDefeatDecision={type:'lastStand',castle:true,clan:s.clan,rank:s.rank};
+     armyResult+=' 守備していた城が落ち、敵兵が城内へなだれ込んだ。';
+    }
+    return '【'+battle.name+'】'+result+' '+armyResult;
+  })));
+ }
+ return peaceService();
+}
+// 敵国から主人公自身への調略。断っても、さらに好条件で再訪することがある。
+function foreignInvitation(){
+ // 調略履歴は勧誘元の大名家ごとに管理する。再勧誘は必ず最初と同じ家から。
+ if(!s.foreignInvitationHistory||typeof s.foreignInvitationHistory!=='object')s.foreignInvitationHistory={};
+ const history=s.foreignInvitationHistory;
+ const eligible=activeProvinces().filter(x=>x[1]!==s.clan&&(history[x[1]]||0)<2);
+ const pending=s.foreignInvitationPending;
+ const repeat=eligible.find(x=>x[1]===pending&&(history[x[1]]||0)===1);
+ const other=repeat||P(eligible);
+ if(!other)return civilian();
+ const previous=history[other[1]]||0;
+ const second=previous===1;
+ const talents=['武勇','知略','魅力'];
+ const strongest=talents.reduce((a,b)=>s.stats[b]>s.stats[a]?b:a,'武勇');
+ const value=s.stats[strongest];
+ const praise={
+  '武勇':value>=75?'戦場にて並ぶ者なきもののふと、その武名は遠国にまで轟いております。':value>=45?'幾多の戦で勇名を馳せたもののふと伺っております。':'勇敢に戦場へ臨む武士と聞き及んでおります。',
+  '知略':value>=75?'類いまれなる先見の明をお持ちで、軍略において右に出る者なしと伺っております。':value>=45?'戦の機を読む優れた知略をお持ちと伺っております。':'物事をよく見極め、思慮深く務められる方と伺っております。',
+  '魅力':value>=75?'人を惹きつけるお人柄と、家臣や領民からの厚い信望は遠国にまで聞こえております。':value>=45?'人望厚く、人々の心をまとめる器量の持ち主と伺っております。':'人との縁を大切にされるお人柄と伺っております。'
+ }[strongest];
+ const bonus=second?R(12,20):R(5,10);
+ const text=s.clan+'に仕えるあなたのもとへ、'+other[1]+'の密使がひそかに訪れた。\n\n「'+praise+'」\n\n「我が殿は、ぜひ貴殿をお迎えしたいと仰せです。'+(second?'先年、我が'+other[1]+'からの誘いをお断りになりましたが、此度は知行も役目も前より厚く取り計らいましょう。':'家臣としてお迎えし、相応の知行をお約束いたします。')+'」\n\n'+(second?'以前と同じ'+other[1]+'から、再び差し出された誘いは一段と手厚い。':'主家への忠義を守るか、新たな主君に仕えるか。決断を迫られている。');
+ return scene(second?'他国からの再度の調略':'他国からの調略',text,[
+  opt('誘いに応じ、'+other[1]+'へ寝返る','所属大名家が変更／家臣から再出発／財産＋'+bonus+(second?'／厚遇の約束':''),()=>{
+   const old=s.clan;
+   s.clan=other[1];s.rank='家臣';s.castle=null;s.independent=false;
+   s.merit=second?6:3;s.trust=second?5:2;
+   mod('財産',bonus);
+   // 受諾した家からの勧誘は完結。ほかの家の履歴は保持する。
+   history[other[1]]=2;
+   s.foreignInvitationPending=null;
+   s.foreignInvitationDeclines=0;
+   s.foreignInvitationCooldown=s.age+R(9,15);
+   if(!Array.isArray(s.achievements))s.achievements=[];
+   s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'転仕',summary:old+'を離れ、'+other[1]+'へ寝返って家臣として仕えた'});
+   return old+'との主従を断ち、密かに'+other[1]+'へ移った。新たな主君は約束どおり家臣として召し抱え、支度金として財産'+bonus+'を与えた。'+(second?'以前より厚い待遇で迎えられた。':'')+'ただし、新参の身として家中の信頼を築き直さねばならない。';
+  }),
+  opt('誘いを断り、今の主君に忠義を尽くす','現在の主家に留まる／同じ家からの再勧誘は一度だけ',()=>{
+   history[other[1]]=previous+1;
+   s.foreignInvitationPending=second?null:other[1];
+   s.foreignInvitationDeclines=0;
+   s.foreignInvitationCooldown=s.age+(second?R(5,9):R(2,5));
+   s.trust+=1;
+   return other[1]+'の密使を退け、'+s.clan+'への忠義を貫いた。'+(second?'二度にわたる拒絶を受け、'+other[1]+'は以後の勧誘を断念した。':'しかし密使は「いつの日か、またお目にかかりましょう」と言い残して去った。');
+  })
+ ]);
+}
+function foreignInvitationChance(){
+ if(!s.clan||!['家臣','重臣'].includes(s.rank)||s.age<22||s.age<(s.foreignInvitationCooldown||0))return false;
+ const history=s.foreignInvitationHistory||{};
+ if(!activeProvinces().some(x=>x[1]!==s.clan&&(history[x[1]]||0)<2))return false;
+ const top=Math.max(s.stats.武勇,s.stats.知略,s.stats.魅力);
+ const pending=s.foreignInvitationPending&&history[s.foreignInvitationPending]===1&&s.foreignInvitationPending!==s.clan;
+ const chance=Math.min(16,2+Math.floor(top/14)+Math.min(3,Math.floor((s.merit||0)/12))+(pending?3:0));
+ return R(1,100)<=chance;
+}
+function enemyRecruitment(){
+ const candidates=activeProvinces().filter(x=>x[1]!==s.clan);
+ const other=P(candidates),target=other[1]+'に仕える武将';
+ return scene('他国武将の調略',s.clan+'の家中で、'+other[0]+'の'+target+'が主君と折り合いを欠いているとの噂が届いた。主君の許しを得て、密かに内応を探る役目を任された。',[ 
+ opt('使者を送り、待遇を約束して内応を促す','知略・魅力が重要／財産－／成功すれば功績',()=>{mod('財産',-R(2,5));let chance=18+Math.floor(s.stats.知略*.4)+Math.floor(s.stats.魅力*.3);if(R(1,100)<=chance){s.merit+=2;s.trust+=4;mod('知略',R(2,4));return '密使が相手の心を動かし、'+target+'から内応の約束を取り付けた。主君から功績を認められた。'}mod('知略',R(1,2));s.trust-=1;return '返答は曖昧で、内応の約束は得られなかった。密使の費用だけが残った。'}),
+ opt('相手の不満と家中の事情を探る','知略＋／慎重な情報収集',()=>{mod('知略',R(2,5));s.trust+=1;return '商人や使者の話を集め、相手の家中の不和と兵糧事情を調べて主君に報告した。'}),
+ opt('金品を贈り、寝返りを働きかける','財産大幅－／成功すれば大きな功績／露見の危険',()=>{mod('財産',-R(5,10));let chance=15+Math.floor(s.stats.魅力*.35)+Math.floor(s.stats.知略*.3);if(R(1,100)<=chance){s.merit+=3;s.trust+=5;mod('魅力',R(2,4));return '贈り物と約束が功を奏し、'+target+'が味方への転身を申し出た。'}s.trust-=R(1,3);mod('魅力',-R(1,2));return '贈答の噂が漏れ、相手に警戒された。交渉は失敗に終わった。'}),
+ opt('危険を避け、調略を見送る','健康は減らない／信頼が少し下がる可能性',()=>{if(R(1,100)<=35)s.trust-=1;return '相手の真意が読めず、軽々しく動かないよう主君に進言した。'})
+ ]);
+}
+
+// Ver.1.8: 追加の生活・奉公イベント（選択肢2〜3、場面ごとに変動）
+const extraEvents={"common":[["旧友からの便り","幼い頃に親しくした友が、遠方から近況を伝えてきた。",[["返事をしたためる","魅力＋／財産－",{"魅力":[2,4],"財産":[-2,-1]},"昔の縁が再びつながった。"],["便りをしまっておく","知略＋／魅力－",{"知略":[1,3],"魅力":[-2,-1]},"友の言葉を胸に留めた。"]]],["市での値段争い","市で米の値が急に上がり、人々が言い争っている。",[["品を買い置く","財産－／知略＋",{"財産":[-4,-2],"知略":[2,4]},"先々の不足に備えた。"],["市の噂を聞く","知略＋／健康－",{"知略":[2,4],"健康":[-3,-1]},"値上がりの理由を探った。"],["買い物を見送る","財産＋／魅力－",{"財産":[1,2],"魅力":[-2,-1]},"無駄な出費を控えた。"]]],["大雨と崩れた橋","激しい雨で橋の一部が崩れ、往来が止まった。",[["橋の修復を手伝う","武勇・魅力＋／健康－",{"武勇":[2,4],"魅力":[1,2],"健康":[-4,-2]},"皆と力を合わせて橋を直した。"],["迂回路を探す","知略＋／健康－",{"知略":[2,5],"健康":[-2,-1]},"安全な道を見つけた。"],["雨が収まるのを待つ","健康＋／財産－",{"健康":[2,5],"財産":[-3,-1]},"無理をせず難を避けた。"]]],["旅の僧との問答","旅の僧が宿を求め、世の移ろいについて語り始めた。",[["話に耳を傾ける","知略＋／武勇－",{"知略":[2,4],"武勇":[-2,-1]},"世の見方を学んだ。"],["宿と食事を用意する","魅力＋／財産－",{"魅力":[2,4],"財産":[-3,-1]},"僧は礼を述べて旅立った。"]]],["近隣での火事","近隣の家から火が上がり、人々が水桶を運んでいる。",[["消火を手伝う","武勇・魅力＋／健康－",{"武勇":[2,4],"魅力":[1,3],"健康":[-5,-2]},"火の勢いを弱めることができた。"],["家財の避難を指揮する","知略＋／健康－",{"知略":[2,4],"健康":[-2,-1]},"大切な品を運び出した。"],["自宅を守る","財産＋／魅力－",{"財産":[1,3],"魅力":[-3,-1]},"自宅は無事だったが、近所との距離ができた。"]]],["行方不明の子","夕暮れになっても近所の子が帰らず、家族が心配している。",[["山道を探す","武勇・魅力＋／健康－",{"武勇":[1,3],"魅力":[2,4],"健康":[-3,-1]},"暗くなる前に子を見つけた。"],["村人を集めて手分けする","知略・魅力＋／財産－",{"知略":[1,3],"魅力":[1,3],"財産":[-2,-1]},"皆の協力で無事に見つかった。"]]],["祭りの準備","社の祭りが近づき、村や城下で準備が始まった。",[["飾り付けを手伝う","魅力＋／健康－",{"魅力":[2,4],"健康":[-3,-1]},"賑やかな祭りになった。"],["寄進する","魅力＋／財産－",{"魅力":[2,5],"財産":[-4,-2]},"人々から感謝された。"],["家で休む","健康＋／魅力－",{"健康":[3,6],"魅力":[-2,-1]},"静かな時間を過ごした。"]]],["流行り病の噂","隣村で病人が増えたという知らせが届いた。",[["往来を控えて養生する","健康＋／財産－",{"健康":[3,6],"財産":[-3,-1]},"病を避けることができた。"],["薬草を集めて届ける","魅力・知略＋／健康－",{"魅力":[2,4],"知略":[1,3],"健康":[-4,-1]},"病人の家族に感謝された。"]]],["不思議な旅人","見慣れぬ旅人が、遠国の暮らしについて話している。",[["旅の話を聞く","知略＋／財産－",{"知略":[2,5],"財産":[-2,-1]},"遠くの土地の事情を知った。"],["道案内を引き受ける","魅力＋／健康－",{"魅力":[2,4],"健康":[-3,-1]},"旅人は無事に次の宿場へ向かった。"]]],["古い道具の発見","物置の奥から、先祖が使ったという古い道具が見つかった。",[["修理して使う","知略＋／財産－",{"知略":[2,4],"財産":[-3,-1]},"道具は再び役立つようになった。"],["売って蓄えにする","財産＋／魅力－",{"財産":[2,5],"魅力":[-2,-1]},"品は商人に引き取られた。"],["家に残しておく","魅力＋／知略－",{"魅力":[1,3],"知略":[-2,-1]},"家族は喜んだ。"]]]],"soldier":[["城壁の修繕","城の土塀に傷みが見つかり、修繕の人手が必要となった。",[["土を運び修繕する","武勇＋／健康－",{"武勇":[2,4],"健康":[-4,-2]},"城の備えが整った。"],["弱い箇所を調べる","知略＋／武勇－",{"知略":[2,5],"武勇":[-2,-1]},"補強すべき場所を見つけた。"],["職人との連絡を担う","魅力＋／財産－",{"魅力":[2,4],"財産":[-2,-1]},"作業は滞りなく進んだ。"]]],["夜半の物音","夜番の最中、城の裏手で不審な物音がした。",[["仲間と見回る","武勇＋／健康－",{"武勇":[2,4],"健康":[-3,-1]},"侵入者の痕跡を確かめた。"],["上役に知らせる","知略＋／魅力－",{"知略":[2,4],"魅力":[-2,-1]},"増援が到着し、警戒が強まった。"],["持ち場を守る","魅力＋／武勇－",{"魅力":[1,3],"武勇":[-2,-1]},"命令を守り通した。"]]],["同僚との口論","些細な仕事の分担から同僚と言い争いになった。",[["正面から話し合う","魅力＋／健康－",{"魅力":[2,4],"健康":[-2,-1]},"互いの言い分を理解した。"],["上役に判断を仰ぐ","知略＋／魅力－",{"知略":[2,4],"魅力":[-3,-1]},"仕事の分担が改められた。"],["黙って自分の仕事をする","武勇＋／魅力－",{"武勇":[1,3],"魅力":[-3,-1]},"仕事は終わったが、わだかまりが残った。"]]],["使者の護衛","近隣の城へ向かう使者の護衛を命じられた。",[["先頭に立って警戒する","武勇＋／健康－",{"武勇":[2,5],"健康":[-4,-2]},"使者を無事に送り届けた。"],["道筋を調べる","知略＋／財産－",{"知略":[2,4],"財産":[-2,-1]},"危険な道を避けた。"],["使者の世話をする","魅力＋／武勇－",{"魅力":[2,4],"武勇":[-2,-1]},"使者から感謝された。"]]],["兵舎の食糧不足","兵舎に届く米が遅れ、仲間の不満が募っている。",[["配給を公平に分ける","知略・魅力＋／健康－",{"知略":[2,4],"魅力":[1,3],"健康":[-2,-1]},"不満を和らげた。"],["自分の蓄えを分ける","魅力＋／財産－",{"魅力":[3,5],"財産":[-4,-2]},"仲間との絆が深まった。"],["上役に不足を訴える","知略＋／魅力－",{"知略":[2,4],"魅力":[-2,-1]},"補給の手配が進んだ。"]]],["古参兵の忠告","古参兵が戦場で生き残る心得を教えてくれた。",[["槍の間合いを教わる","武勇＋／健康－",{"武勇":[2,4],"健康":[-3,-1]},"武具の扱いに慣れた。"],["戦場の話を聞く","知略＋／武勇－",{"知略":[2,5],"武勇":[-2,-1]},"戦場での判断を学んだ。"]]],["主君の巡見","主君が城内を見回ることになり、各所で準備が進んでいる。",[["武具を整えて待つ","武勇＋／財産－",{"武勇":[1,3],"財産":[-2,-1]},"役目を無事に果たした。"],["報告書を整える","知略＋／健康－",{"知略":[2,4],"健康":[-3,-1]},"上役から仕事ぶりを評価された。"],["仲間をまとめて準備する","魅力＋／健康－",{"魅力":[2,4],"健康":[-2,-1]},"巡見は滞りなく終わった。"]]],["矢の不足","弓兵から矢が足りないと訴えがあった。",[["矢竹を集める","武勇＋／健康－",{"武勇":[2,4],"健康":[-3,-1]},"補充に必要な材料が揃った。"],["残りの矢を数えて配分する","知略＋／武勇－",{"知略":[2,4],"武勇":[-2,-1]},"矢を無駄なく配分した。"]]],["山城への登り道","山城へ続く道が荒れ、兵の行き来が難しくなっている。",[["石を運び道を直す","武勇＋／健康－",{"武勇":[2,4],"健康":[-4,-2]},"登り道が歩きやすくなった。"],["安全な道順を調べる","知略＋／財産－",{"知略":[2,4],"財産":[-2,-1]},"新たな道筋を記録した。"],["村人に協力を頼む","魅力＋／財産－",{"魅力":[2,4],"財産":[-3,-1]},"村人と協力して道を整えた。"]]],["敵方の噂","敵方の武将が兵を集めているとの噂が広がった。",[["武具の稽古を重ねる","武勇＋／健康－",{"武勇":[2,5],"健康":[-4,-2]},"備えを強めた。"],["噂の出どころを探る","知略＋／財産－",{"知略":[2,5],"財産":[-3,-1]},"噂の真偽を確かめた。"],["仲間の不安を和らげる","魅力＋／知略－",{"魅力":[2,4],"知略":[-2,-1]},"兵たちは落ち着きを取り戻した。"]]]],"civilian":[["畑を荒らす猪","畑に猪が現れ、作物が荒らされた。",[["追い払う","武勇＋／健康－",{"武勇":[2,4],"健康":[-4,-2]},"猪は山へ逃げていった。"],["柵を工夫する","知略＋／財産－",{"知略":[2,4],"財産":[-3,-1]},"畑の被害が減った。"],["近所と見張りを分担する","魅力＋／健康－",{"魅力":[2,4],"健康":[-2,-1]},"協力して畑を守った。"]]],["行商人の誘い","行商人から遠くの市へ品を運ばないかと誘われた。",[["同行して商いを学ぶ","財産・知略＋／健康－",{"財産":[2,5],"知略":[1,3],"健康":[-4,-2]},"遠国の商いを知った。"],["品を預けて売ってもらう","財産＋／魅力－",{"財産":[1,4],"魅力":[-2,-1]},"少しの利益を得た。"],["誘いを断る","健康＋／財産－",{"健康":[2,4],"財産":[-2,-1]},"家の仕事を優先した。"]]],["井戸の水不足","日照りが続き、村の井戸の水が減っている。",[["新しい水場を探す","知略＋／健康－",{"知略":[2,4],"健康":[-4,-2]},"水の湧く場所を見つけた。"],["水を公平に分ける","魅力＋／財産－",{"魅力":[2,4],"財産":[-2,-1]},"村人の争いを防いだ。"]]],["庄屋からの頼み","庄屋が村の帳面の整理を手伝ってほしいと頼んできた。",[["帳面を整える","知略＋／武勇－",{"知略":[2,5],"武勇":[-2,-1]},"村の収支が見やすくなった。"],["村人への連絡を担う","魅力＋／健康－",{"魅力":[2,4],"健康":[-3,-1]},"仕事が滞りなく進んだ。"],["家業を優先する","財産＋／魅力－",{"財産":[2,4],"魅力":[-2,-1]},"家の蓄えを増やした。"]]],["麦の収穫","麦の刈り入れ時期になり、村は忙しくなった。",[["刈り入れを手伝う","財産＋／健康－",{"財産":[2,5],"健康":[-4,-2]},"収穫を終えた。"],["収穫の手順を工夫する","知略＋／財産－",{"知略":[2,4],"財産":[-2,-1]},"来年に向けた工夫を得た。"]]],["旅芸人の一座","旅芸人が村に立ち寄り、小さな興行を開いた。",[["一座を手伝う","魅力＋／健康－",{"魅力":[2,4],"健康":[-2,-1]},"旅芸人と親しくなった。"],["芸を見て楽しむ","健康＋／財産－",{"健康":[3,5],"財産":[-3,-1]},"久しぶりに心が休まった。"],["家業を続ける","財産＋／魅力－",{"財産":[1,3],"魅力":[-2,-1]},"働いて蓄えを増やした。"]]],["借金の相談","知り合いが家計に困り、少し金を貸してほしいと頼んできた。",[["貸して助ける","魅力＋／財産－",{"魅力":[3,5],"財産":[-5,-2]},"相手は深く礼を述べた。"],["働き口を紹介する","知略・魅力＋／健康－",{"知略":[1,3],"魅力":[1,3],"健康":[-2,-1]},"知り合いは仕事を得た。"],["丁寧に断る","財産＋／魅力－",{"財産":[1,2],"魅力":[-3,-1]},"蓄えを守ったが、相手は肩を落とした。"]]],["川の増水","川の水かさが増し、渡し舟が止まってしまった。",[["舟を引き上げる","武勇＋／健康－",{"武勇":[2,4],"健康":[-4,-2]},"舟の流失を防いだ。"],["別の渡し場を探す","知略＋／財産－",{"知略":[2,4],"財産":[-2,-1]},"安全に川を渡れる場所を見つけた。"]]],["職人の手伝い","村を訪れた職人が作業の手伝いを探している。",[["道具の扱いを教わる","知略＋／健康－",{"知略":[2,4],"健康":[-3,-1]},"手仕事の知恵を得た。"],["力仕事を請け負う","武勇・財産＋／健康－",{"武勇":[2,4],"財産":[1,3],"健康":[-4,-2]},"働きに応じた報酬を得た。"],["職人を客に紹介する","魅力＋／財産－",{"魅力":[2,4],"財産":[-2,-1]},"新しい縁ができた。"]]],["遠方からの年貢使","年貢の取り立てについて、役人が村にやって来た。",[["帳面を確認する","知略＋／健康－",{"知略":[2,4],"健康":[-2,-1]},"取り立ての内容を確認した。"],["村人の事情を訴える","魅力＋／財産－",{"魅力":[2,4],"財産":[-3,-1]},"役人に事情を伝えた。"],["家の蓄えを守る","財産＋／魅力－",{"財産":[1,3],"魅力":[-2,-1]},"支出を抑えた。"]]]]};
+function extraScene(kind){let pool=extraEvents[kind].concat(extraEvents.common);let recent=s.recentEvents||[];let eligible=pool.filter(x=>!recent.some(y=>y.title===x[0]&&s.age-y.age<5));if(!eligible.length)eligible=pool.filter(x=>!recent.some(y=>y.title===x[0]&&s.age-y.age<2));let item=P(eligible.length?eligible:pool);return scene(item[0],item[1],item[2].map(o=>opt(o[0],o[1],()=>{let d={};for(let k in o[2])d[k]=R(o[2][k][0],o[2][k][1]);return change(d,o[3])})));}
+function novelScene(factory){let recent=s.recentEvents||[];let result=factory();for(let i=0;i<8&&recent.some(y=>y.title===result.title&&s.age-y.age<4);i++){let candidate=factory();if(!recent.some(y=>y.title===candidate.title&&s.age-y.age<4)){result=candidate;break}}return result;}
+
+// 大名の平時は下役から命じられるのではなく、家臣へ指示を出す。
+function daimyoPeaceScene(){
+ const rest=opt('城内で養生し、政務を家臣に任せる','健康＋／財産－',()=>change({健康:R(5,10),財産:-R(1,3)},'重臣たちに政務を任せ、しばし静養した。'));
+ return novelScene(()=>P([
+ ()=>scene('大名の政務 ― 家臣への下知','重臣から領内の訴えと治安について報告が届いた。領主であるあなたが方針を決め、家臣に命じる。',[
+  opt('奉行に村々の争いを裁かせる','知略＋／魅力＋',()=>change({知略:R(2,5),魅力:R(1,3)},'奉行に裁定を命じ、領内の争いを収めた。')),
+  opt('家臣に巡察と警備の強化を命じる','武勇＋／財産－',()=>change({武勇:R(2,4),財産:-R(1,3)},'家臣に巡察を命じ、城下と街道の警戒を強めた。')),
+  opt('重臣を集め、年貢の扱いを協議する','知略・魅力＋／財産－',()=>change({知略:R(2,4),魅力:R(2,4),財産:-R(1,3)},'家中の意見を聞き、年貢の方針を定めた。')),rest]),
+ ()=>scene('大名の政務 ― 軍備の評定','家臣から兵糧と武具の備蓄状況が報告された。次の戦に備え、あなたは軍備の方針を決める。',[
+  opt('各隊の大将に調練を命じる','武勇・魅力＋／健康－',()=>change({武勇:R(2,4),魅力:R(1,3),健康:-R(1,2)},'各隊の大将へ下知し、軍勢の調練を進めた。')),
+  opt('兵糧奉行に備蓄の増強を命じる','知略＋／財産－',()=>change({知略:R(3,5),財産:-R(2,4)},'兵糧奉行に命じて備蓄を整えた。')),
+  opt('重臣に隣国の情勢を探らせる','知略・魅力＋',()=>change({知略:R(2,4),魅力:R(1,2)},'密偵を放つよう重臣に命じ、隣国の動向を探った。')),rest]),
+ ()=>scene('大名の政務 ― 城下の訴え','城下の商人と村の名主が謁見し、往来と市場の扱いについて裁きを求めてきた。あなたの裁定を家臣たちが待っている。',[
+  opt('商人の往来を保護するよう命じる','財産・魅力＋',()=>change({財産:R(1,3),魅力:R(2,4)},'商人の往来を保護するよう家臣に命じ、城下の賑わいが増した。')),
+  opt('奉行に道と橋の修繕を命じる','知略・魅力＋／財産－',()=>change({知略:R(2,4),魅力:R(1,3),財産:-R(2,4)},'奉行に普請を命じ、領内の往来を整えた。')),
+  opt('重臣に双方の事情を調べさせる','知略＋／健康＋',()=>change({知略:R(2,4),健康:R(1,3)},'重臣に調査を命じ、裁定の材料を揃えた。')),rest])
+ ])());
+}
+// 子供は従来の人数カウントを維持しつつ、個別に氏名・性別・生死を記録する。
+function makeChildRecord(gender,preferred){
+ const sex=gender|| (R(1,100)<=55?'男':'女');
+ const pool=sex==='男'?maleNames:femaleNames;
+ const used=new Set([s.name.split(' ').pop(),...(s.childRecords||[]).map(x=>x.name)]);
+ const available=pool.filter(x=>!used.has(x));
+ return {name:preferred||P(available.length?available:pool),gender:sex,born:birthYear()+s.age,alive:true};
+}
+function ensureChildRecords(){
+ if(!Array.isArray(s.childRecords))s.childRecords=[];
+ const count=Math.max(0,s.children||0);
+ if(s.childRecords.length===0&&s.heirSon){
+  const son=makeChildRecord('男',s.heirSon.name);
+  son.born=s.heirSon.born||birthYear()+s.age-18;
+  son.alive=s.heirSon.alive!==false;
+  s.childRecords.push(son);
+ }
+ while(s.childRecords.length<count){
+  const child=makeChildRecord();child.born=birthYear()+s.age-R(1,Math.min(30,Math.max(1,s.age-17)));
+  s.childRecords.push(child);
+ }
+}
+function currentHostage(){return s.hostage&&s.hostage.status==='held'?s.hostage:null;}
+function hostageName(h){return h?(h.type==='wife'?'妻の':h.gender==='女'?'娘の':'息子の')+h.name:'';}
+function hostageEligible(){
+ if(!s||!s.clan||s.successionMode||s.hostageOfferResolved||currentHostage()||
+   !(['家臣','重臣'].includes(s.rank)||(s.rank==='大名'&&!s.independent&&s.overlord))||
+   (s.trust||0)>7)return false;
+ ensureChildRecords();
+ const hasChild=s.childRecords.some(x=>x.alive!==false);
+ const firstWife=!!s.spouse&&(!s.firstWifeName||s.spouse===s.firstWifeName)&&
+   !(s.formerWives||[]).includes(s.spouse)&&!s.lordAdoptedDaughter;
+ return hasChild||firstWife;
+}
+function hostageEvent(){
+ ensureChildRecords();
+ const children=s.childRecords.filter(x=>x.alive!==false);
+ const chosen=children.length?P(children):null;
+ const hostage=chosen?{type:'child',name:chosen.name,gender:chosen.gender,status:'held',lord:militaryAllegiance()}
+  :{type:'wife',name:s.spouse,status:'held',lord:militaryAllegiance()};
+ const who=hostageName(hostage);
+ return scene('人質の要求 ― 忠誠の証',
+  '主君の使者が屋敷を訪れた。\n\n「近ごろ、殿はそなたの忠節を案じておられる。謀反の疑いを晴らすため、'+who+'を主君の城へ預けてはくれぬか。信頼の証としての話だ。決して悪いようにはしない」\n\n家族を主君の城へ差し出せば、当面の疑念は晴れるだろう。だが、のちに主君へ謀反を起こせば、'+who+'の命は危うい。\n\nあなたはどうするか。',[
+  opt(who+'を人質として差し出す','主君の信頼＋／知略＋／財産＋／謀反時に人質処刑の危険',()=>{
+   s.hostageOfferResolved=true;s.hostage=hostage;
+   s.trust=(s.trust||0)+R(9,15);mod('知略',R(3,6));mod('財産',R(5,10));
+   note(who+'を'+hostage.lord+'の城へ人質として差し出した。');
+   return who+'は主君の城へ移された。主君は忠節の証を喜び、褒賞を与えた。しかし、謀反に踏み切れば'+who+'の命が危ういことを、あなたは忘れられない。';
+  }),
+  opt('人質を出すことを断る','主君の信頼大幅－／財産大幅－／追放の可能性',()=>{
+   s.hostageOfferResolved=true;s.trust=Math.max(0,(s.trust||0)-R(15,24));mod('財産',-R(12,22));
+   if(R(1,100)<=28){const old=militaryAllegiance();s.previousService={clan:old,rank:s.rank,year:birthYear()+s.age,reason:'人質差し出し拒否による追放'};s.clan=null;s.rank='浪人';s.castle=null;s.independent=false;s.overlord=null;
+    note('人質の差し出しを拒み、'+old+'から追放された。');return '人質を出すことを拒んだ。主君は激怒し、所領を取り上げ、あなたを追放した。家族は手元に残ったが、あなたは浪人となった。';}
+   note('人質の差し出しを拒否し、主君の信頼と財産を大きく失った。');
+   return 'あなたは人質を差し出さなかった。主君の不信は一層深まり、厳しい処分と出費を強いられた。';
+  })
+ ]);
+}
+function hostageRebellionWarning(){const h=currentHostage();return h?'\n\n【人質の危険】'+hostageName(h)+'は'+h.lord+'の城にいる。ここで主君への謀反に加担すれば、処刑される可能性が非常に高い。':'';}
+function resolveHostageRebellion(){
+ const h=currentHostage();if(!h)return '';
+ // 主君への反逆時は人質が高確率で処刑される。
+ if(R(1,100)<=82){
+  h.status='executed';
+  if(h.type==='child'){
+   ensureChildRecords();const child=s.childRecords.find(x=>x.name===h.name&&x.gender===h.gender&&x.alive!==false);
+   if(child)child.alive=false;
+   if(s.heirSon&&s.heirSon.name===h.name)s.heirSon.alive=false;
+   s.children=Math.max(0,(s.children||0)-1);
+  }else if(s.spouse===h.name){s.spouse=null;s.marriageYear=null;}
+  note('主君への謀反により、人質の'+hostageName(h)+'が処刑された。');
+  return '\n\n【人質の悲報】主君は謀反の報せを受け、人質の'+hostageName(h)+'を処刑した。';
+ }
+ h.status='escaped';note('謀反の混乱に乗じて人質の'+hostageName(h)+'が城から逃れた。');
+ return '\n\n【人質の行方】'+hostageName(h)+'は処刑を免れ、混乱の中で城を脱した。';
+}
+function releaseHostage(){const h=currentHostage();if(!h)return '';h.status='released';note('人質の'+hostageName(h)+'が主君の城から帰還した。');return '\n人質の'+hostageName(h)+'も城から戻された。';}
+// 主君の養女との縁組。既婚5年以上の家臣・重臣だけに、一生に一度提示される。
+function lordAdoptedDaughterEligible(){
+ if(!s||!s.clan||!['家臣','重臣'].includes(s.rank)||!s.spouse||s.successionMode||s.divorceOfferResolved||(currentHostage()&&currentHostage().type==='wife'))return false;
+ const year=birthYear()+s.age;
+ // 旧セーブには結婚年がないため、初回確認年を起点にする。
+ if(!Number.isFinite(s.marriageYear)){s.marriageYear=year;return false;}
+ return year-s.marriageYear>=5;
+}
+function lordAdoptedDaughterScene(){
+ const oldWife=s.spouse,oldClan=s.clan;
+ const princess=chooseMarriageName([oldWife]);
+ const castle=(s.region||'領内')+'城';
+ return scene('主君の養女 ― 栄達か、妻への情か',
+ '主君から密かに呼び出された。\n\n「そなたとの縁を、さらに深めたい。我が養女'+princess+'を妻に迎えてはくれぬか。そなたはわしの義理の子となる。城と領地を与え、一国一城の大名に取り立てよう」\n\nだが、その場に居並ぶ家老たちは口をそろえる。\n「今の妻とは離縁していただく。それが縁組の条件にございます」\n\n気立てがよく、愛らしい妻'+oldWife+'。苦楽をともにしてきた妻と離縁すれば、二度と会うことはできない。\n\nあなたは、栄達と妻への情のどちらを選ぶか。',
+ [
+  opt('妻'+oldWife+'と離縁し、主君の養女'+princess+'を迎える','離縁／妻とは二度と会えない／主君の義子・大名へ',()=>{
+   s.divorceOfferResolved=true;
+   if(!Array.isArray(s.formerWives))s.formerWives=[];
+   if(!s.formerWives.includes(oldWife))s.formerWives.push(oldWife);
+   s.spouse=princess;s.marriageYear=birthYear()+s.age;
+   s.lordInLaw=oldClan;s.lordAdoptedDaughter=princess;
+   const result=becomeDaimyo(castle,'主君の養女との縁組と城領下賜',true);
+   note('主君の求めに応じ、妻'+oldWife+'と離縁した。'+princess+'を迎え、'+oldClan+'の主君と義理の親子となった。');
+   return '妻'+oldWife+'は静かに屋敷を去った。二度と会うことはない。\n\nあなたは'+princess+'と祝言を挙げ、'+oldClan+'の主君と義理の親子となった。\n'+result;
+  }),
+  opt('縁組を断り、妻'+oldWife+'を選ぶ','武勇・知略・魅力が大幅上昇／主君の信頼低下',()=>{
+   s.divorceOfferResolved=true;
+   mod('武勇',R(8,13));mod('知略',R(8,13));mod('魅力',R(10,16));
+   s.trust=Math.max(0,(s.trust||0)-R(12,18));
+   note('主君の養女との縁組を断り、妻'+oldWife+'との暮らしを守った。主君の信頼は損なわれた。');
+   return 'あなたは主君と家老たちの前で頭を下げた。\n「過分なお話、ありがたく存じます。しかし、'+oldWife+'を捨ててまで得る地位は望みませぬ」\n\n主君は不興を示し、家中の視線は冷たくなった。それでも、屋敷に戻れば'+oldWife+'がいつものように迎えてくれた。';
+  })
+ ]);
+}
+function peaceService(){
+let rank=s.rank||'足軽';
+if(['足軽','足軽大将'].includes(rank)&&R(1,100)<=55)return extraScene('soldier');
+if(rank==='大名')return !s.independent&&s.overlord&&R(1,100)<=16?daimyoIndependenceScene():daimyoPeaceScene();
+if((rank==='家臣'||rank==='重臣'||rank==='家中筆頭')&&R(1,100)<=24)return enemyRecruitment();
+let rest=opt('傷を養生し、身体を休める','健康＋6〜12／武勇－3〜5／知略－3〜5／財産－1〜2',()=>change({健康:R(6,12),武勇:-R(3,5),知略:-R(3,5),財産:-R(1,2)},'療養して体力を取り戻したが、鍛錬や学びから離れ、腕と勘が鈍った。'));
+let pick=(arr)=>novelScene(()=>P(arr)());
+if(rank==='重臣'||rank==='家中筆頭')return pick([
+()=>scene('一向一揆への対応','領内の寺院勢力と門徒の間で不満が高まり、一揆の兆しがある。主君から対応策を問われた。',[opt('寺院の代表と交渉する','知略・魅力＋／財産－',()=>{s.trust+=2;return change({知略:R(2,5),魅力:R(1,3),財産:-R(1,3)},'使者を通じて要求を聞き、争いを避ける道を探った。')}),opt('年貢と負担の見直しを進言する','魅力＋／財産－／主君の評価に影響',()=>{s.trust+=R(0,2);return change({魅力:R(3,5),財産:-R(2,5)},'領民の負担を軽くする方針が示され、当面の緊張は和らいだ。')}),opt('兵を配置し、武力で威圧する','武勇＋／魅力－／反発の危険',()=>{s.trust+=1;return change({武勇:R(2,4),魅力:-R(2,5),健康:-R(1,3)},'兵を集めて警戒を強めたが、門徒の反発も招いた。')}),rest]),
+()=>scene('他国との外交交渉','隣国の使者が訪れ、国境の通行と兵糧の取引について協議を求めてきた。',[opt('互いの利益を探り、通行を認める','知略・魅力＋／財産＋',()=>{s.trust+=2;return change({知略:R(3,5),魅力:R(2,4),財産:R(1,3)},'条件を詰め、両国の商人が往来できるよう取り決めた。')}),opt('主君に慎重な対応を進言する','知略＋／魅力－',()=>change({知略:R(2,5),魅力:-R(1,2)},'使者への返答を保留し、隣国の真意を調べた。')),opt('強硬な条件を突きつける','武勇・財産＋の機会／魅力－',()=>change({武勇:R(1,3),財産:R(0,3),魅力:-R(2,4)},'強い姿勢を示したが、交渉は難航した。')),rest]),
+()=>scene('領内の訴訟と裁定','二つの村が用水の利用をめぐって争い、双方の名主が裁定を求めている。',[opt('双方の証文と事情を調べる','知略＋／信頼＋',()=>{s.trust+=2;return change({知略:R(3,6),魅力:R(1,2)},'古い証文を確認し、双方が納得できる分水を定めた。')}),opt('名主を集めて和解を促す','魅力＋／財産－',()=>change({魅力:R(3,6),財産:-R(1,3)},'村々の代表が話し合い、争いはひとまず収まった。')),opt('一方の主張を採用して早期決着させる','知略＋／魅力－',()=>change({知略:R(1,3),魅力:-R(2,4)},'裁定は下ったが、不満を残す村人もいた。')),rest])]);
+if(rank==='家臣')return pick([
+()=>scene('村同士の境界争い','隣り合う二つの村が山林の境界を争っている。あなたは担当の家臣として、配下に調査を命じ、裁定を進めることにした。',[opt('古い境界標と証文を調べる','知略＋／健康－',()=>change({知略:R(3,6),健康:-R(1,2)},'現地と証文を照合し、争いの原因を突き止めた。')),opt('両村の年寄を集めて話し合う','魅力＋／財産－',()=>change({魅力:R(3,6),財産:-R(1,2)},'双方の話を聞き、妥協案をまとめた。')),opt('警備を増やして衝突を防ぐ','武勇＋／魅力－',()=>change({武勇:R(2,4),魅力:-R(1,3)},'衝突は避けられたが、村人は警戒を強めた。')),rest]),
+()=>scene('一揆の気配','領内で年貢への不満が広がり、寺社の周囲に人が集まっている。あなたは配下の者に状況の確認を命じ、対応策を検討することにした。',[opt('村々を回り、要求を聞き取る','知略・魅力＋／健康－',()=>change({知略:R(2,4),魅力:R(2,4),健康:-R(1,3)},'配下からの報告を受け、村人の訴えを整理した。')),opt('兵を率いて要所を警備する','武勇＋／魅力－',()=>change({武勇:R(2,5),魅力:-R(1,3)},'要所の警備を固め、騒動の拡大を防いだ。')),opt('年貢担当の者に負担軽減を検討させる','知略＋／信頼が変動',()=>{s.trust+=R(0,2);return change({知略:R(3,5),財産:-R(1,2)},'年貢担当の者に見直しを命じた。')}),rest]),
+()=>scene('城下の治安維持','城下で盗難と商人同士の争いが続き、見回りの指揮を任された。',[opt('番所の配置を見直す','知略＋／武勇－',()=>change({知略:R(3,5),武勇:-R(1,2)},'番所の配置を改め、見回りの無駄を減らした。')),opt('商人の話を聞いて仲裁する','魅力＋／財産－',()=>change({魅力:R(3,5),財産:-R(1,2)},'商人の不満を聞き、争いを収めた。')),opt('配下と夜回りを増やす','武勇＋／健康－',()=>change({武勇:R(2,5),健康:-R(1,3)},'夜回りを重ね、城下の秩序を守った。')),rest])]);
+if(rank==='足軽大将')return pick([
+()=>scene('足軽組の訓練','配下の足軽たちの槍の扱いが揃わない。組の訓練を任された。',[opt('隊列を組んで反復訓練する','武勇＋／健康－',()=>change({武勇:R(3,5),健康:-R(1,3)},'配下の動きが揃い、隊の士気が上がった。')),opt('兵の得意不得意を見極める','知略＋／魅力＋',()=>change({知略:R(3,5),魅力:R(1,3)},'兵ごとの役割を見直し、隊の動きがよくなった。')),opt('負傷兵を休ませ、装備を点検する','魅力＋／財産－',()=>change({魅力:R(2,5),財産:-R(1,2)},'配下の信頼を得て、武具の不備も減った。')),rest]),
+()=>scene('村の警備と年貢輸送','年貢米を城へ運ぶ道で盗賊の噂があり、護衛を命じられた。',[opt('隊列を整えて護衛する','武勇＋／健康－',()=>change({武勇:R(2,5),健康:-R(1,3)},'輸送隊を無事に城へ送り届けた。')),opt('通行する道を調べて危険を避ける','知略＋／財産－',()=>change({知略:R(3,5),財産:-R(1,2)},'安全な道を選び、荷を失わずに済んだ。')),opt('村人から道中の事情を聞く','魅力＋／知略＋',()=>change({魅力:R(2,4),知略:R(1,3)},'村人の協力を得て、道中の警戒を整えた。')),rest]),
+()=>scene('兵糧と武具の点検','次の動員に備え、足軽組の兵糧と武具の数を確かめるよう命じられた。',[opt('不足する槍や具足を調べる','知略＋／財産－',()=>change({知略:R(2,5),財産:-R(1,2)},'装備の不足をまとめ、上役に報告した。')),opt('兵糧の分配を工夫する','知略＋／魅力＋',()=>change({知略:R(2,4),魅力:R(1,3)},'兵糧の無駄を減らし、兵たちの不満も抑えた。')),opt('自ら武具の手入れを指導する','武勇＋／健康－',()=>change({武勇:R(2,5),健康:-R(1,2)},'武具の手入れを教え、組の備えを整えた。')),rest])]);
+return pick([
+()=>scene('武具の手入れ','組頭から槍と具足の点検を命じられた。戦のない日も武具を整えることは足軽の大切な務めだ。',[opt('槍の穂先と柄を念入りに整える','武勇＋／健康－',()=>change({武勇:R(2,4),健康:-R(1,2)},'槍を手入れし、扱いにも慣れた。')),opt('破損した武具を調べて報告する','知略＋／魅力＋',()=>change({知略:R(2,4),魅力:R(1,2)},'傷んだ武具を見つけ、組頭に報告した。')),opt('仲間と分担して作業を終える','魅力＋／財産－',()=>change({魅力:R(2,4),財産:-R(1,2)},'仲間と協力して武具を整えた。')),rest]),
+()=>scene('城門の警備','城門の番を命じられた。商人や使者が行き交い、怪しい者がいないか確かめる必要がある。',[opt('命令どおり門を警備する','武勇＋／健康－',()=>change({武勇:R(2,4),健康:-R(1,2)},'持ち場を守り、無事に番を終えた。')),opt('通行人と荷物を丁寧に確かめる','知略＋／魅力－',()=>change({知略:R(2,4),魅力:-R(1,2)},'不審な荷を見つけ、組頭に報告した。')),opt('旅人の話を聞いて情報を集める','魅力・知略＋',()=>change({魅力:R(2,3),知略:R(1,3)},'街道の噂を聞き、城下の様子を知った。')),rest]),
+()=>scene('兵糧の運搬','陣屋へ米俵と薪を運ぶよう命じられた。兵糧の管理も足軽の務めである。',[opt('荷を担いで運搬を進める','武勇＋／健康－',()=>change({武勇:R(2,5),健康:-R(2,3)},'荷運びを終え、腕力と持久力が鍛えられた。')),opt('運ぶ順序と人数を工夫する','知略＋／魅力＋',()=>change({知略:R(2,4),魅力:R(1,2)},'手順を工夫し、仕事を早く終えた。')),opt('米俵の数を帳面と照合する','知略＋／武勇－',()=>change({知略:R(3,5),武勇:-R(1,2)},'不足する兵糧を見つけ、組頭に報告した。')),rest]),
+()=>scene('街道の見回り','組頭から街道の巡回を命じられた。道の状態や不審な動きを確かめる。',[opt('決められた道を見回る','武勇＋／健康－',()=>change({武勇:R(2,4),健康:-R(1,2)},'街道を巡り、異状がないことを報告した。')),opt('道や橋の傷みを記録する','知略＋／健康－',()=>change({知略:R(2,4),健康:-R(1,2)},'橋の修繕が必要な箇所を見つけた。')),opt('村人から最近の様子を聞く','魅力＋／知略＋',()=>change({魅力:R(2,4),知略:R(1,2)},'村人の話から近隣の事情を知った。')),rest]),
+()=>scene('槍の稽古','組の者たちが槍の稽古をしている。戦に備えて身体を鍛える機会だ。',[opt('組頭の指示に従い稽古する','武勇＋／健康－',()=>change({武勇:R(3,6),健康:-R(1,3)},'繰り返し槍を振り、技を磨いた。')),opt('上手な足軽の動きを観察する','知略＋／武勇＋',()=>change({知略:R(2,4),武勇:R(1,2)},'熟練の足軽から間合いの取り方を学んだ。')),opt('新入りの稽古を手伝う','魅力＋／武勇＋',()=>change({魅力:R(2,4),武勇:R(1,2)},'新入りに基本を教え、仲間の信頼を得た。')),rest])]);
+}
+function banditRaid(){
+ const village=s.rank==='浪人'?'滞在していた村':'暮らしている村';
+ return scene('野盗の襲撃',village+'に野盗の一団が押し寄せた。村人たちは家財を抱えて逃げ惑い、助けを求めている。あなたはまだ、いずれの大名にも仕えていない。',[
+ opt('村人と協力して野盗を追い払う','武勇・魅力＋／負傷・戦死の危険',()=>{
+  mod('武勇',R(2,5));mod('魅力',R(1,4));let wound=R(4,11);mod('健康',-wound);
+  let risk=Math.max(1,7-Math.floor(s.stats.武勇/25));
+  if(R(1,100)<=risk){s.alive=false;s.cause='村を襲った野盗との戦いで命を落とした。';return '村人を守るため野盗に立ち向かったが、激しい戦いの末に討死した。'}
+  return '村人と力を合わせて野盗を退けた。傷を負ったが、村には安堵が広がった。';
+ }),
+ opt('村人を安全な場所へ避難させる','知略・魅力＋／健康が少し減る可能性',()=>{
+  mod('知略',R(2,4));mod('魅力',R(2,4));if(R(1,100)<=35)mod('健康',-R(1,4));
+  return '逃げ道を確保して村人を導いた。家財の一部は奪われたが、多くの人が難を逃れた。';
+ }),
+ opt('家族とともに村を離れる','健康を守る／財産－／魅力－',()=>change({財産:-R(3,8),魅力:-R(1,3)},'家族とともに山道へ逃れた。命は守れたが、村に残した財を失った。')),
+ opt('村の長老と相談し、食糧を渡して退去を求める','知略＋／財産－／交渉が失敗する可能性',()=>{
+  mod('財産',-R(3,7));mod('知略',R(1,4));
+  if(R(1,100)<=65){mod('魅力',R(1,3));return '食糧と引き換えに野盗は引き揚げた。村はひとまず戦火を免れた。'}
+  mod('健康',-R(2,5));return '交渉はまとまらず、混乱の中で負傷した。野盗は食糧を奪って去った。';
+ })]);
+}
+function merchantLife(){
+ const level=s.merchantLevel||0;
+ const titles=['小商人','商家の当主','豪商','御用商人'];
+ const target=[0,7,18,34];
+ const knowledge=[0,20,42,65],charm=[0,20,38,58];
+ if(level<3&&(s.tradeMerit||0)>=target[level+1]&&s.stats.知略>=knowledge[level+1]&&s.stats.魅力>=charm[level+1]){
+  s.merchantLevel=level+1;s.rank=titles[level+1];
+  note(titles[level+1]+'となった。');
+  queueMilestone('商人として出世 ― '+s.rank,'商売の実績が認められ、'+s.rank+'となった。\n財産の上限は100のまま。');
+ }
+ const opportunities=[
+  ['米の売買','各地の米相場が動いている。買い付けるか、堅実に商いを続けるか。',[
+   opt('米を仕入れて売る','財産－／知略による商売判定',()=>{mod('財産',-R(2,5));if(R(1,100)<=Math.min(90,35+s.stats.知略)){s.tradeMerit=(s.tradeMerit||0)+2;return reward('財産',R(5,10),'米の売買が当たり、利益を得た。')}return '相場を読み違え、仕入れ分が損失となった。'},()=>s.stats.財産>0),
+   opt('堅実に店を切り盛りする','財産＋／商売実績＋',()=>{s.tradeMerit=(s.tradeMerit||0)+1;return reward('財産',R(1,3),'地道な商いで信用を得た。')}),
+   opt('取引先との縁を深める','魅力＋／商売実績＋',()=>{s.tradeMerit=(s.tradeMerit||0)+1;return change({魅力:R(1,3)},'取引先との関係を深めた。')})]],
+  ['城下町での商機','城下町の人出が増えている。商いを広げる好機かもしれない。',[
+   opt('新たな店に投資する','財産－／成功すると大きな利益',()=>{mod('財産',-R(4,8));if(R(1,100)<=Math.min(90,30+s.stats.知略)){s.tradeMerit=(s.tradeMerit||0)+3;return reward('財産',R(8,15),'新たな店が繁盛した。')}return '出店は振るわず、投資が損失となった。'},()=>s.stats.財産>=4),
+   opt('今ある店を大切にする','財産＋／商売実績＋',()=>{s.tradeMerit=(s.tradeMerit||0)+1;return reward('財産',R(2,4),'堅実な商売を続けた。')}),
+   opt('商人仲間と情報を交換する','知略＋',()=>change({知略:R(2,4)},'市の動向を学んだ。'))]],
+  ['大名家からの注文','城の兵糧や道具を調達してほしいと依頼が届いた。',[
+   opt('大口の注文を引き受ける','財産－／成功で商売実績＋',()=>{mod('財産',-R(3,7));if(R(1,100)<=Math.min(92,35+s.stats.知略+s.stats.魅力/3)){s.tradeMerit=(s.tradeMerit||0)+3;return reward('財産',R(7,13),'納入を成功させ、大名家から信用を得た。')}return '納入に失敗し、仕入れ代を失った。'},()=>s.stats.財産>=3),
+   opt('小さな注文だけ引き受ける','財産＋／商売実績＋',()=>{s.tradeMerit=(s.tradeMerit||0)+1;return reward('財産',R(1,4),'無理のない範囲で品を納めた。')}),
+   opt('武士への転身を願い出る','仕官できる可能性',()=>{if(R(1,100)<=Math.min(85,18+s.stats.魅力)){s.clan=s.local;s.rank='足軽';return '商人としての縁を頼りに、'+s.clan+'に仕えることとなった。'}return '今は仕官を認められなかった。'})]]
+ ];
+ const crises=[
+ ['夜盗の侵入','夜半、蔵に盗賊が忍び込んだ。放置すれば財産の半分を奪われる。',[ 
+ opt('帳簿と足跡から犯人を突き止め、武家に捜索を頼む','知略45・魅力40以上で被害回避',()=>{if(s.stats.知略>=45&&s.stats.魅力>=40){s.tradeMerit=(s.tradeMerit||0)+2;return change({魅力:2},'武家の協力を得て盗賊を捕らえ、品物を取り戻した。')}mod('財産',-Math.ceil(s.stats.財産/2));return '証拠が足りず捜索は難航し、財産の半分を失った。'}),
+ opt('自ら蔵に踏み込み、盗賊を迎え撃つ','武勇45以上なら撃退／失敗で負傷と損失',()=>{if(s.stats.武勇>=45){s.tradeMerit=(s.tradeMerit||0)+1;return change({武勇:2},'盗賊を返り討ちにし、財産を守った。')}mod('財産',-Math.ceil(s.stats.財産/2));mod('健康',-R(7,15));return '盗賊に打ち負かされ、負傷して財産の半分を失った。'}),
+ opt('家族の命を優先して逃げる','財産が半減／健康を守る',()=>{mod('財産',-Math.ceil(s.stats.財産/2));return '家族は無事だったが、財産の半分を盗まれた。'})]],
+ ['掛け売りの焦げ付き','大口の取引先が支払いを拒み、商家の資金繰りが危うい。',[ 
+ opt('帳簿を調べて返済を交渉する','知略・魅力で成功判定',()=>{if(R(1,100)<=Math.min(90,(s.stats.知略+s.stats.魅力)/2)){s.tradeMerit=(s.tradeMerit||0)+2;return reward('財産',R(2,5),'証文を示して返済を受け、信用も守った。')}mod('財産',-R(9,17));return '交渉が決裂し、代金を回収できなかった。'}),
+ opt('損失を受け入れ、取引先を変える','財産－／知略＋',()=>change({財産:-R(6,12),知略:R(2,4)},'痛手を負ったが、危険な取引先を整理した。'))]],
+ ['敵国からの密かな注文','敵国の使者が武具を高値で買いたいと申し出た。売れば利益は大きいが、戦乱を長引かせる恐れがある。',[ 
+ opt('敵国へ武具を密売する','財産大幅＋／魅力大幅－／露見の危険',()=>{mod('魅力',-R(9,16));if(R(1,100)<=22){mod('財産',-R(9,20));s.tradeMerit=Math.max(0,(s.tradeMerit||0)-3);return '密売が露見し、荷を没収された。悪評だけが残った。'}s.tradeMerit=(s.tradeMerit||0)+3;return reward('財産',R(12,22),'敵国への武具売却で大金を得たが、人々の信用を失った。')}),
+ opt('注文を断り、通常の商いを続ける','魅力＋／財産は少し増加',()=>change({魅力:R(2,4),財産:R(1,3)},'目先の利益を捨て、信用を守った。'))]],
+ ['人買いの誘い','人買いが捕虜や困窮した者を売り渡す取引を持ちかけてきた。巨利を得られるが、人の人生を踏みにじる商いだ。',[ 
+ opt('人身売買に手を染める','財産大幅＋／魅力大幅－／処罰の危険',()=>{mod('魅力',-R(14,24));s.reputation.push('非道な商い');if(R(1,100)<=25){mod('財産',-R(12,22));return '取引が発覚し、利益を没収された。人々からも忌み嫌われた。'}return reward('財産',R(15,26),'非道な取引で富を得たが、取り返しのつかない悪名を負った。')}),
+ opt('誘いを拒み、困窮者を助ける','魅力＋／財産－',()=>change({魅力:R(4,7),財産:-R(2,5)},'利益より人の命を選び、周囲の信頼を得た。'))]],
+ ['商家の資金難','戦乱と不作が重なり、取引が途絶えた。店を守るための金が足りない。',[ 
+ opt('家財を売り払い、店を守る','財産－／商売実績＋',()=>{s.tradeMerit=(s.tradeMerit||0)+1;return change({財産:-R(5,12),知略:2},'身を削って商売を続けた。')}),
+ opt('危険な高利の借財に頼る','一時的に財産＋／翌年に返済負担',()=>{const borrowed=R(9,16);s.debt=(s.debt||0)+Math.ceil(borrowed*1.5);return reward('財産',borrowed,'財産'+borrowed+'を借りた。翌年には利息込みで'+Math.ceil(borrowed*1.5)+'の返済が必要となる。')}),
+ opt('刀を取り、戦で再起を図る','足軽に転身／初陣へ',()=>{s.clan=s.local;s.rank='足軽';s.pendingBattle=true;return '商いを離れて軍勢に加わり、戦功による再起を目指した。'})]]
+ ];
+ if(s.stats.財産<=12&&R(1,100)<=35){if(s.stats.財産<=8)return scene('破産の瀬戸際','店の運転資金が尽きかけた。商人を続けるか、戦場で身を立てるか。',[opt('働き口を探し、地道に再起する','健康－／財産＋',()=>change({健康:-R(3,7),財産:R(2,4)},'働いてわずかな資金を得た。')),opt('足軽となり戦で手柄を立てる','武士に転身／初陣へ',()=>{s.clan=s.local;s.rank='足軽';s.pendingBattle=true;return '刀を取り、戦場での立身を選んだ。'})]);}
+ if(R(1,100)<=46){let item=P(crises);return scene(item[0],item[1],item[2]);}
+ const item=P(opportunities);return scene(item[0],item[1],item[2]);
+}
+function civilian(){if(R(1,100)<=67)return extraScene('civilian');let war=R(1,100)<=32;if(war)return scene('戦火が迫る','近隣で合戦が始まり、村にも兵が押し寄せた。収穫や商いを続けることは難しい。',[opt('兵の募集を探す','武功による立身の機会／初陣なら初陣と表示',()=>{s.clan=s.clan||s.local;s.rank='足軽';s.pendingBattle=true;return '兵として出陣することとなった。組頭の命令を待つ。'}),opt('家族を連れて避難する','財産が減る／安全を優先',()=>{mod('財産',-R(2,7));return '家族とともに難を逃れたが、暮らしは苦しくなった。'}),opt('村に残り、家業を守る','財産を守れる場合もある／健康に影響',()=>{if(R(1,100)<=40){mod('財産',-R(6,12));mod('健康',-R(3,9));return '戦乱に巻き込まれ、家財を失った。'}return reward('財産',2,'どうにか家業を守り抜いた。')})]);return scene('暮らしの日々',['小商人','商家の当主','豪商','御用商人'].includes(s.rank)?'商いを続けるうち、近隣の武家の動きが耳に入る。':'田畑の仕事を続けながら、戦の噂に耳を傾けている。',[opt('兵の募集を探す','仕官の機会を探す',()=>{s.seen.seek=true;return '兵の募集を探し始めた。次の機会に備えることにした。'}),...(s.rank==='百姓'?[opt('商いを始める','百姓から小商人へ転身する',()=>{s.rank='小商人';s.merchantLevel=0;s.tradeMerit=s.tradeMerit||0;return '田畑での暮らしを離れ、商いを始めた。'})]:[]),opt('家業を続ける','財産が少し増える',()=>change({財産:R(2,5),健康:-R(1,4),武勇:-R(1,2)},'働き詰めで蓄えは増えたが、疲労が残った。')),opt('人との縁を大切にする','魅力が少し成長',()=>change({魅力:R(2,5),財産:-R(1,3),知略:-R(1,2)},'村人との縁が深まったが、付き合いに蓄えを使った。'))])}
+// Ver.9.0: 主家を失った浪人の「主家再興」。旧主の血筋と旧臣を集め、段階的に再起を図る。
+// 史実上の大名家の滅亡は変更しない。成功しても地方の小勢力としての再興にとどまる。
+function beginHouseRestoration(old,withHeir){
+ if(!old||s.rank!=='浪人'||s.clan||s.houseRestoration&&s.houseRestoration.status==='active')return '今は再興の旗を掲げられない。';
+ s.houseRestoration={clan:old,stage:0,heir:!!withHeir||!!(s.roninWard&&s.roninWard.clan===old),followers:0,funds:0,sponsor:null,year:birthYear()+s.age,status:'active'};
+ if(!Array.isArray(s.achievements))s.achievements=[];
+ s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'再興の志',summary:old+'の再興を志し、旧臣との連絡を始めた'});
+ note(old+'の再興を志した。');
+ return old+'の名をもう一度掲げるため、あなたは密かに旧臣を探し始めた。成功の保証はなく、命を失う恐れもある。';
+}
+function restorationScene(){
+ const h=s.houseRestoration;
+ if(!h||h.status!=='active'||s.rank!=='浪人'||s.clan)return null;
+ const old=h.clan,year=birthYear()+s.age;
+ // 旧セーブも含め、既に保護・逃亡を助けた若君の存在を再興計画へ引き継ぐ。
+ if(s.roninWard&&s.roninWard.clan===old)h.heir=true;
+ const quit=()=>opt('再興を断念し、浪人として生きる','再興計画を終了／浪人生活に戻る',()=>{h.status='abandoned';return 'あなたは旧家の名を胸にしまい、再び一人の浪人として旅立った。';});
+ if(h.stage===0&&h.heir){h.stage=1;return scene('主家再興 ― 若君を旗印に',old+'の血を引く若君は、あなたが以前に保護し、命をつないだ人物だ。'+(s.roninWard&&s.roninWard.whereabouts==='temple'?'若君は今も遠方の寺に身を寄せている。':'若君はひそかに身を隠している。')+'その血筋を旗印に、旧臣を集めて再興を目指す。',[opt('旧臣に密書を送り、再興の準備を始める','若君を旗印に旧臣集めへ進む',()=> 'かつて逃がした若君の無事を確かめ、旧臣たちへ密書を送った。'),quit()]);}
+ if(h.stage===0)return scene('主家再興 ― 旧主の血筋',old+'の再興を願う旧臣が集まり始めた。しかし、家名を継ぐ者がいなければ諸将の支持は得にくい。かつての主家の血筋を探すべきか、旧臣だけで旗を掲げるべきか。',[ 
+  opt('旧主の血筋を探し出す','知略・魅力判定／財産－／成功すると支持を得やすい',()=>{mod('財産',-R(2,6));const chance=Math.min(90,25+Math.floor((s.stats.知略+s.stats.魅力)/2));h.heir=!!(s.roninWard&&s.roninWard.clan===old)||R(1,100)<=chance;h.stage=1;if(h.heir){if(!(s.roninWard&&s.roninWard.clan===old))s.roninWard={clan:old,year};return '【探索成功】'+(s.roninWard.whereabouts==='temple'?'以前に寺へ逃がした若君の所在を確かめた。':'旧主の血を引く若者を見つけ、ひそかに保護した。')+'旧臣たちは再興への望みをつないだ。'}return '【探索不首尾】確かな血筋は見つからなかった。あなたは旧臣をまとめて再興を目指すことにした。';}),
+  opt('旧臣を旗印にして再興を進める','血筋の後ろ盾なし／武勇・魅力＋',()=>{h.stage=1;mod('魅力',R(1,3));return '家名を慕う者たちが、あなたを中心に集まり始めた。';}),quit()]);
+ if(h.stage===1)return scene('主家再興 ― 旧臣を集める','山里や宿場に散った'+old+'の旧臣へ、密かに文を送った。志を同じくする者もいれば、再び戦乱に巻き込まれることを恐れる者もいる。',[
+  opt('旧臣を説得し、仲間を募る','魅力・知略判定／成功で兵力増加',()=>{const c=Math.min(92,27+Math.floor((s.stats.魅力+s.stats.知略)/2));h.followers+=R(1,100)<=c?R(2,3):1;h.stage=2;return '旧臣が'+h.followers+'組集まり、再興の旗に力を貸すと誓った。';}),
+  opt('武芸を示して浪人を募る','武勇判定／負傷の危険',()=>{const c=Math.min(90,25+s.stats.武勇);const good=R(1,100)<=c;h.followers+=good?R(2,4):1;h.stage=2;if(!good)mod('健康',-R(4,10));return good?'武芸に心を動かされた浪人たちが加わった。':'仲間は集まったが、手合わせで傷を負った。';}),quit()]);
+ if(h.stage===2)return scene('主家再興 ― 軍資金','再興の志だけでは兵糧も武具も揃わない。集まった旧臣を養い、旗を掲げるためには軍資金が必要だった。',[
+  opt('蓄えを投じて軍備を整える','財産－10／準備を進める',()=>{mod('財産',-10);h.funds+=3;h.stage=3;return '蓄えを投じ、兵糧と武具を揃えた。再興の軍勢は小さいながらも形を整えた。';},()=>s.stats.財産>=10),
+  opt('商人に支援を求める','魅力・知略判定／失敗で負債の恐れ',()=>{const c=Math.min(88,22+Math.floor((s.stats.魅力+s.stats.知略)/2));const good=R(1,100)<=c;h.funds+=good?3:1;h.stage=3;if(!good)mod('財産',-R(2,5));return good?'商人たちは旧家との縁を信じ、軍資金と兵糧を用立ててくれた。':'商人の支援はわずかだった。手元の銭も減ったが、計画は続く。';}),
+  opt('旧臣と働き、少しずつ蓄える','健康－／時間をかけて準備',()=>{mod('健康',-R(3,7));h.funds+=2;h.stage=3;return '旧臣たちと働いて兵糧を蓄えた。大軍ではないが、出陣の準備は進んだ。';}),quit()]);
+ if(h.stage===3){const patrons=availableServiceClans().filter(x=>x!==old);const patron=patrons.length?P(patrons):null;return scene('主家再興 ― 後ろ盾','兵と兵糧は集まった。しかし周辺の大名が再興を認めなければ、旗を掲げてもすぐに討伐されかねない。',[
+  ...(patron?[opt(patron+'に後ろ盾を求める','知略・魅力判定／成功で再興の見込み上昇',()=>{const c=Math.min(85,18+Math.floor((s.stats.知略+s.stats.魅力)/2));if(R(1,100)<=c){h.sponsor=patron;h.stage=4;return patron+'が限定的な支援を約束した。ただし、再興後もその庇護を受けることが条件だ。'}h.stage=4;return patron+'は援助を断った。自力での再興を迫られることとなった。';})]:[]),
+  opt('後ろ盾を頼らず独力で進む','支援なし／困難な戦いへ',()=>{h.sponsor=null;h.stage=4;mod('魅力',R(1,3));return 'あなたは旧臣たちと力を合わせ、自らの旗だけで再興を目指す決断をした。';}),quit()]);}
+ return scene('主家再興 ― 決起の刻','旧臣が集まり、兵糧も揃った。'+(h.heir?'旧主の血を引く若者を旗印に、':'旧家の名を旗印に、')+'あなたたちは旧領の一角に拠点を得ようとしている。\n\n周囲の勢力が黙って見過ごすとは限らない。成否はまだわからない。あなたはどうするか。',[
+  opt('旧臣を率いて決起する','武勇・知略・準備で判定／失敗時は負傷・討死の危険',()=>{
+   const c=Math.min(88,Math.max(12,12+Math.floor((s.stats.武勇+s.stats.知略+s.stats.魅力)/8)+h.followers*6+h.funds*5+(h.heir?9:0)+(h.sponsor?12:0)));
+   if(R(1,100)<=c){h.status='restored';h.yearRestored=year;s.roninWard=null;s.clan=old.replace(/家$/,'')+'再興家';s.rank='重臣';s.castle=null;s.independent=false;s.trust=12;s.merit=(s.merit||0)+3;rememberHighestRank(s.rank);s.achievements.push({age:s.age,year,kind:'主家再興',summary:old+'の旧臣を集め、'+s.clan+'を地方の小勢力として再興した'});note(old+'の再興を果たし、重臣として新たな主家を支えることとなった。');queueMilestone('主家再興 ― 旗は再び',old+'の旧臣が集い、'+s.clan+'が地方の小勢力として再び旗を掲げた。\nあなたは重臣として再興した家を支える。'+(h.sponsor?'\n'+h.sponsor+'の庇護を受けている。':''));return '【再興成功・'+c+'％】旧臣の奮戦により拠点を確保した。'+old+'の名を継ぐ小さな家が再び生まれた。あなたはその重臣として新たな主君に仕える。史実上の旧大名政権が復活したわけではない。';}
+   h.status='failed';s.roninWard=null;mod('財産',-R(5,13));if(risk(9,'主家再興の決起に失敗し、討死した。'))return '【再興失敗・'+c+'％】決起は鎮圧され、あなたは旧臣とともに戦場に倒れた。';mod('健康',-R(10,23));s.achievements.push({age:s.age,year,kind:'再興失敗',summary:old+'の再興を目指して決起したが、敗れて浪人に戻った'});return '【再興失敗・'+c+'％】旧臣は散り散りとなり、あなたも深手を負って落ち延びた。再び浪人として生きることとなった。';
+  }),
+  opt('今は決起を見送り、準備を重ねる','次の年に持ち越す／財産－',()=>{mod('財産',-R(2,4));h.funds=Math.min(5,h.funds+1);return '決起を見送り、備えを固めた。時機を待つことにした。';}),quit()]);
+}
+// Ver.6.8: 浪人の境遇・前歴に応じた専用事件。旧セーブにも安全に適用する。
+function roninPast(){
+ const past=s.previousService||{};
+ const rebel=/謀反|下剋上|実権奪取|乗っ取り/.test(past.reason||'');
+ const lost=/滅亡|没落|独立喪失|主家の終焉/.test(past.reason||'') ||
+  (!rebel&&(s.achievements||[]).some(a=>a.kind==='主家滅亡'&&a.year>=(past.year||0)));
+ return {past,rebel,lost,old:past.clan||null};
+}
+function roninScene(){
+ if(!s.seen)s.seen={};
+ if(!s.seen.roninEpisodes)s.seen.roninEpisodes={};
+ const done=s.seen.roninEpisodes,info=roninPast(),events=[];
+ const once=(id,make)=>{if(!done[id])events.push({id,make})};
+ const available=()=>availableServiceClans().filter(c=>c!==renamedClan(info.old||'',birthYear()+s.age));
+ const rejoin=(clan,how)=>{
+  if(!availableServiceClans().includes(clan)||isBannedService(clan))return 'その家への仕官は認められなかった。';
+  const rank=rankForReemployment();s.clan=clan;s.rank=rank;s.trust=2;s.castle=null;s.independent=false;
+  rememberHighestRank(rank);
+  if(!Array.isArray(s.achievements))s.achievements=[];
+  s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'再仕官',summary:clan+'に'+rank+'として再仕官した（'+how+'）'});
+  return clan+'に'+rank+'として迎えられた。';
+ };
+ if(info.lost&&info.old&&!(s.houseRestoration&&s.houseRestoration.status==='active')){
+  once('oldComrade',()=>scene('旧臣との再会','城下の茶屋で、かつて'+info.old+'に共に仕えた旧臣と再会した。男もまた主家を失い、仕官先を探しているという。',[ 
+   opt('旧臣と主家再興を誓う','主家再興ルート開始／長い準備と戦の危険',()=>beginHouseRestoration(info.old,false)),
+   opt('共に仕官先を探す','知略・魅力＋／再仕官の縁を得る',()=>{s.roninReferral=(s.roninReferral||0)+1;return change({知略:R(1,3),魅力:R(1,3),財産:-2},'旧臣と情報を交換し、互いのために仕官先を探す約束をした。') }),
+   opt('路銀を渡す','財産－／魅力＋',()=>change({財産:-R(3,6),魅力:R(3,5)},'苦境にある旧臣を助け、再会を喜び合った。'),()=>s.stats.財産>=3),
+   opt('思い出を語って別れる','魅力＋',()=>change({魅力:R(1,3)},'共に過ごした戦場を語り、別々の道へ旅立った。'))]));
+  once('heir',()=>scene('旧主の遺児','旅の宿で老人がひそかにあなたを呼び止めた。連れている少年は、'+info.old+'の当主の血を引く者だという。真偽は定かでないが、追われる身であることは確かなようだ。',[ 
+   opt('若君をかくまい、守り抜く','財産－／追手の危険／後日談が発生',()=>{mod('財産',-R(5,10));s.roninWard={clan:info.old,year:birthYear()+s.age};if(R(1,100)<=25){mod('健康',-R(3,9));return '少年を保護したが、道中で追手に遭い負傷した。少年は無事に逃がした。';}return '少年を連れて身を隠した。旧主の血筋を守る責任が、あなたの肩にのしかかった。'},()=>s.stats.財産>=5),
+   opt('遠方の寺へ逃がす','知略判定／成功で魅力＋',()=>{mod('財産',-R(2,5));s.roninWard={clan:info.old,year:birthYear()+s.age,whereabouts:'temple'};if(R(1,100)<=Math.min(90,35+s.stats.知略)){mod('魅力',R(3,6));return '人目を避ける道を選び、少年を安全な寺へ送り届けた。'}mod('健康',-R(2,5));return '追手を避けるため苦労したが、少年を別の土地へ逃がした。'}),
+   opt('関わらず立ち去る','危険を避ける',()=> '真偽もわからぬ話に関わらず、その場を後にした。') ]));
+  once('revenge',()=>scene('仇討ちの誘い','旧臣たちがあなたを訪ねてきた。'+info.old+'を追い詰めた相手に一矢報いるため、少人数で襲撃を企てているという。成功の見込みは薄い。',[ 
+   opt('旧臣と共に仇討ちに向かう','武勇判定／討死・負傷の危険',()=>{mod('財産',-R(2,5));const chance=Math.min(80,18+Math.floor(s.stats.武勇*.6)+Math.floor(s.stats.知略*.2));if(R(1,100)<=chance){mod('武勇',R(2,5));mod('魅力',R(2,4));return '襲撃に成功し、追手を振り切った。主家が戻るわけではないが、旧臣たちは涙を流した。'}if(risk(7,'旧主の仇討ちに加わり、討死した。'))return '襲撃は失敗し、あなたは戦場に倒れた。';mod('健康',-R(7,16));return '襲撃は失敗した。命からがら逃げ延びたが、深手を負った。'}),
+   opt('無謀な計画を思いとどまらせる','知略・魅力判定',()=>{if(R(1,100)<=Math.min(90,20+(s.stats.知略+s.stats.魅力)/2)){mod('魅力',R(2,5));return '旧臣たちは説得に応じ、生き延びる道を選んだ。'}return '旧臣たちは聞き入れず、あなたのもとを去っていった。'}),
+   opt('誘いを断る','危険を避ける',()=> '過去への思いを胸にしまい、今を生きる道を選んだ。') ]));
+ }
+ if(militaryRankOrder.indexOf(s.highestMilitaryRank||'')>=2&&available().length){
+  once('enemyGeneral',()=>{
+   const target=P(available());
+   return scene('かつての敵将','城下町に滞在中、'+target+'の使者が訪れた。かつて戦場であなたの働きを見た武将が、その武勇を評価しているという。使者は仕官の話を持ちかけてきた。',[ 
+    opt('仕官を受け入れる','過去の役職を考慮して再仕官',()=>rejoin(target,'敵将からの推挙')),
+    opt('禄高を交渉する','魅力・知略判定／交渉決裂の可能性',()=>{const chance=Math.min(85,20+(s.stats.魅力+s.stats.知略)/3);if(R(1,100)<=chance){mod('財産',R(4,8));return '待遇の交渉がまとまった。'+rejoin(target,'待遇交渉');}return '要求が折り合わず、仕官の話は立ち消えとなった。'}),
+    opt('かつての敵には仕えない','浪人を続ける',()=> '使者に礼を述べ、申し出を断った。') ]);
+  });
+ }
+ if(info.rebel&&info.old){
+  once('pursuers',()=>scene('追手の影','宿場で、あなたの人相を尋ね歩く武士たちを見かけた。'+info.old+'で起こした謀反の失敗を、今も追及している者がいるらしい。',[ 
+   opt('山道を抜けて逃れる','武勇・健康を消耗／逃走判定',()=>{mod('健康',-R(3,7));if(R(1,100)<=Math.min(90,35+s.stats.武勇)){return '険しい山道を越え、追手をまいた。'}mod('財産',-R(4,8));mod('健康',-R(3,8));return '追手に見つかり、荷を捨てて逃げ延びた。'}),
+   opt('変装して人混みに紛れる','知略判定／失敗で財産－',()=>{if(R(1,100)<=Math.min(90,30+s.stats.知略)){mod('知略',R(1,3));return '身なりを変え、追手の目を欺いた。'}mod('財産',-R(5,10));return '見破られかけ、銭を渡して辛うじて逃れた。'}),
+   opt('追手と対峙する','武勇判定／討死の危険',()=>{const c=Math.min(85,18+s.stats.武勇);if(R(1,100)<=c){mod('武勇',R(2,4));return '追手を退け、その場を離れた。'}if(risk(9,'謀反の追手との戦いで討死した。'))return '追手との斬り合いに敗れ、命を落とした。';mod('健康',-R(9,18));return '斬り合いの末、傷を負いながら逃げ延びた。'} )]));
+ }
+ if(s.roninWard&&s.roninWard.clan&&!(s.houseRestoration&&s.houseRestoration.status==='active')){
+  once('wardAftermath',()=>scene('若君の行く末',(s.roninWard.whereabouts==='temple'?'遠方の寺へ逃がした旧主の遺児も成長しつつある。':'かくまっていた旧主の遺児も成長しつつある。')+s.roninWard.clan+'の名を掲げるべきか、それとも身を隠して生き延びるべきか。',[ 
+   opt('若君を奉じて主家再興を目指す','主家再興ルート開始／旧臣を集める',()=>beginHouseRestoration(s.roninWard.clan,true)),
+   opt('安全な寺に預ける','財産－／若君を安全な場所へ',()=>{mod('財産',-R(2,5));s.roninWard=null;mod('魅力',R(2,4));return '若君を信頼できる寺に託した。旧家の血筋はひそかに守られることとなった。'}),
+   opt('身を隠したまま守る','財産－／健康－／責任を持ち続ける',()=>change({財産:-R(3,6),健康:-R(1,3),魅力:R(1,3)},'若君とともに、身分を隠して暮らす道を選んだ。')),
+   opt('旧臣に託して別れる','知略＋／護衛を引き継ぐ',()=>{s.roninWard=null;return change({知略:R(2,4)},'信頼できる旧臣に若君を託し、自らは旅を続けた。')}) ]));
+ }
+ // 生活のための仕事は繰り返し発生してよい。
+ events.push({id:'bodyguard',make:()=>scene('用心棒の依頼','街道を行く商人が、荷を狙う盗賊を恐れて護衛を頼んできた。報酬は悪くないが、道中の危険は避けられない。',[ 
+  opt('護衛を引き受ける','財産＋／武勇判定／負傷の恐れ',()=>{if(R(1,100)<=Math.min(90,32+s.stats.武勇)){return change({財産:R(5,11),武勇:R(1,3),健康:-R(1,4)},'盗賊を退け、商人から約束の報酬を受け取った。')}mod('健康',-R(5,12));mod('財産',R(1,3));return '盗賊に襲われ負傷した。商人を逃がし、わずかな礼金を受け取った。'}),
+  opt('危険な道を避ける策を練る','知略判定／成功で財産＋',()=>{if(R(1,100)<=Math.min(90,25+s.stats.知略)){return change({財産:R(4,8),知略:R(2,4)},'迂回路を選び、襲撃を避けて荷を送り届けた。')}mod('財産',R(1,3));return '道の選定に手間取ったが、商人を送り届けた。'}),
+  opt('依頼を断る','危険を避ける',()=> '今は命を賭ける仕事を受けず、旅を続けた。') ])});
+ events.push({id:'bandits',make:()=>scene('盗賊討伐の頼み','近くの村で盗賊が食糧を奪い、村人たちは困り果てている。村の長があなたに助けを求めた。',[ 
+  opt('刀を取って盗賊を討つ','武勇判定／財産＋／負傷の恐れ',()=>{if(R(1,100)<=Math.min(90,25+s.stats.武勇)){return change({武勇:R(2,4),魅力:R(2,4),財産:R(2,5)},'盗賊を退け、村人から礼金と感謝を受けた。')}mod('健康',-R(6,13));return '盗賊との戦いで傷を負ったが、村人を逃がすことはできた。'}),
+  opt('村人と守りを固める','知略・魅力判定／被害を減らす',()=>{if(R(1,100)<=Math.min(90,25+(s.stats.知略+s.stats.魅力)/2)){return change({知略:R(2,4),魅力:R(2,4),財産:R(1,3)},'見張りと柵を整え、盗賊を退けた。')}mod('財産',-R(1,3));return '守りは万全ではなかったが、村人の被害を抑えた。'}),
+  opt('村を離れる','危険を避ける',()=> '村人に詫び、別の土地へ向かった。') ])});
+ if(!events.length)return null;
+ const chosen=P(events);
+ if(!['bodyguard','bandits'].includes(chosen.id))done[chosen.id]=true;
+ return chosen.make();
+}
+// Ver.6.8: 浪人はいつでも武士の道を離れ、百姓・商人に転身できる。
+function leaveWarriorLife(){
+ return scene('武士の道を離れる','主家を失ってから、幾度も旅を重ねた。刀を携えて再び仕官を目指す道もあれば、田畑を耕し、あるいは商いで家族を養う道もある。武士として過ごした日々は消えないが、これからの暮らしは自分で選べる。',[
+  opt('刀を置き、百姓として暮らす','浪人をやめて百姓になる／今後は農村の生活イベント',()=>{s.clan=null;s.rank='百姓';s.abandonedWarrior=true;s.seen.seek=false;s.pendingBattle=false;s.roninReferral=0;s.retiredFromWarriorYear=birthYear()+s.age;mod('健康',-R(1,3));s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'転身',summary:'浪人暮らしに区切りをつけ、百姓となった'});note('刀を置き、百姓として暮らし始めた。');return '武士としての再仕官を諦め、田畑を耕して暮らすことにした。かつての武功は胸にしまい、これからは家族と日々の収穫を守って生きていく。';}),
+  opt('刀を置き、商人として生きる','浪人をやめて小商人になる／商売の出世ルートへ',()=>{s.clan=null;s.rank='小商人';s.merchantLevel=0;s.tradeMerit=s.tradeMerit||0;s.abandonedWarrior=true;s.seen.seek=false;s.pendingBattle=false;s.roninReferral=0;s.retiredFromWarriorYear=birthYear()+s.age;mod('財産',-Math.min(s.stats.財産,R(2,5)));s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'転身',summary:'浪人暮らしに区切りをつけ、商人となった'});note('武士の道を離れ、小商人として商いを始めた。');return '刀を置き、わずかな蓄えを元手に商いを始めた。武士としての経験を活かしながら、新たな生業で身を立てていく。';}),
+  opt('まだ武士の道を捨てない','浪人のまま仕官先を探し続ける',()=> '刀を手放す決心はつかなかった。もうしばらく、武士として生きる道を探すことにした。')
+ ]);
+}
+function wander(){if(s.houseRestoration&&s.houseRestoration.status==='active')return restorationScene();if(s.familyMassacre&&!s.villageRiceSeen&&!s.spouse&&R(1,100)<=28)return riceBallVillageScene();if(s.familyMassacre&&R(1,100)<=36)return solitaryRoninScene();if(R(1,100)<=18)return leaveWarriorLife();if(R(1,100)<=72){const episode=roninScene();if(episode)return episode;}return scene('浪人の日々','仕える家を失い、生活は不安定になった。旧知の者を頼るか、新たな土地を訪れるか。',[opt('武士の道を離れ、新たな生業を選ぶ','百姓・商人への転身を選択する',()=>{s.pendingCivilianChoice=true;return 'これからの生き方を考え直すことにした。';}),opt('仕官先を探す','過去の役職・謀反歴を考慮して再仕官',()=>{
+ const candidates=availableServiceClans();
+ if(!candidates.length)return '今は仕官を受け入れてくれる大名家が見つからなかった。';
+ const local=historicalSuccessor(s.local,birthYear()+s.age);
+ const target=candidates.includes(local)&&R(1,100)<=55?local:P(candidates);
+ const notorious=(s.failedRebellions||[]).length>0;
+ const chance=Math.max(8,Math.min(90,18+Math.floor((s.stats.武勇+s.stats.知略+s.stats.魅力)/6)-(notorious?15:0)+Math.min(18,(s.roninReferral||0)*9)));s.roninReferral=0;
+ if(R(1,100)<=chance){const rank=rankForReemployment();s.clan=target;s.rank=rank;s.trust=notorious?0:2;s.castle=null;s.independent=false;s.previousService=s.previousService||null;rememberHighestRank(rank);if(!Array.isArray(s.achievements))s.achievements=[];s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'再仕官',summary:'過去の経歴を評価され、'+target+'に'+rank+'として再仕官した'});return '【再仕官成功・'+chance+'％】'+(notorious?'謀反に失敗した過去を警戒されたが、':'')+'かつての役職と働きが認められ、'+target+'に'+rank+'として迎えられた。';}
+ return '【再仕官失敗・'+chance+'％】'+target+'に仕官を願い出たが、'+(notorious?'謀反の前歴も警戒され、':'')+'採用は見送られた。';
+ }),opt('武芸を鍛える','武勇が成長／財産を消費',()=>{mod('財産',-2);return change({武勇:R(3,7),健康:-R(2,5),知略:-R(1,3)},'苦しい暮らしの中でも鍛錬を続け、身体を酷使した。')}),opt('旧友を訪ねる','魅力が成長',()=>change({魅力:R(3,6),財産:-R(2,4),武勇:-R(1,2)},'旧友と再会したが、旅費と滞在費で蓄えを失った。'))])}
+function chooseMarriageName(exclude){
+ const forbidden=new Set([...(s.formerWives||[]),...(exclude||[])]);
+ const choices=femaleNames.filter(name=>!forbidden.has(name));
+ return P(choices.length?choices:femaleNames);
+}
+function family(){const bride=chooseMarriageName();return scene('縁談', (s.familyMassacre?'旅先で縁談の話が持ち込まれた。相手は':'親類を通じて縁談が持ち込まれた。相手は')+bride+(s.familyMassacre?'という。あなたの返事を待っている。':'という。家族は返事を待っている。'),[opt('縁談を受ける','結婚する',()=>{s.spouse=bride;if(!s.firstWifeName)s.firstWifeName=bride;s.marriageYear=birthYear()+s.age;return '縁談がまとまり、'+bride+'を妻に迎えた。'}),opt('今は断る','独身を続ける',()=> '今は自分の道を優先することにした。')])}
+function elderIllness(){
+ const names=['長引く咳と熱','足腰の衰え','胸の痛み','腹の病','目のかすみと頭痛'];
+ const title=P(names),ageRisk=s.age>=75?14:s.age>=65?9:s.age>=55?5:3;
+ return scene('老境の病 ― '+title,'近頃、'+title+'に悩まされている。歳を重ねた身体に無理は禁物だが、暮らしや務めを休むわけにもいかない。',[ 
+ opt('医師を呼び、薬を求める','財産－8／回復しやすい',()=>{mod('財産',-8);if(risk(Math.max(1,ageRisk-3)+(s.stats.健康<25?5:0),'病が悪化して亡くなった。'))return '医師の手当てもむなしく、病が悪化した。';return change({健康:R(4,10)},'薬と静養が功を奏し、病状は落ち着いた。')},()=>s.stats.財産>=8),
+ opt('仕事を休み、家で養生する','健康回復の可能性／財産－2',()=>{mod('財産',-2);if(risk(ageRisk+(s.stats.健康<25?6:0),'病が悪化して亡くなった。'))return '静養を続けたが、病には勝てなかった。';return change({健康:R(1,6),財産:-R(0,2)},'家族の助けでしばらく休み、少し持ち直した。')},()=>s.stats.財産>=2),
+ opt('無理をして働き続ける','財産＋／健康大幅－／重症化の危険',()=>{mod('財産',R(2,5));mod('健康',-R(7,15));if(risk(ageRisk+R(6,12)+(s.stats.健康<25?8:0),'病を押して働き、命を落とした。'))return '働き続けた末、病が急変した。';return '仕事はこなしたものの、病が長引いて身体を大きく損ねた。'}),
+ opt('祈祷に頼り、回復を待つ','財産－3／回復は不確実',()=>{mod('財産',-3);if(risk(ageRisk+3+(s.stats.健康<25?6:0),'病が悪化して亡くなった。'))return '祈りは届かず、病が重くなった。';return change({健康:R(-5,5)},'祈りを捧げて時を過ごした。病の経過は定かでない。')},()=>s.stats.財産>=3)
+ ]);
+}
+// 主君から由緒ある名字を賜る。史実に登場する武家の名字を中心に、地域ごとの候補を用意。
+const bestowedSurnames={
+ '尾張':['佐久間','丹羽','柴田','前田'], '美濃':['明智','稲葉','安藤','氏家'],
+ '三河':['酒井','榊原','本多','大久保'], '甲斐':['小山田','穴山','甘利','馬場'],
+ '駿河':['朝比奈','岡部','庵原','瀬名'], '越後':['柿崎','直江','本庄','色部'],
+ '信濃':['真田','高梨','海野','望月'], '近江':['蒲生','浅井','朽木','京極'],
+ '備前':['宇喜多','松田','伊賀','花房'], '安芸':['吉川','小早川','宍戸','熊谷'],
+ '周防':['陶','内藤','杉','問田'], '肥前':['鍋島','江上','成松','百武'],
+ '薩摩':['伊集院','肝付','新納','種子島'], '播磨':['小寺','別所','三木','黒田'],
+ '土佐':['香宗我部','吉良','久武','谷'],
+ '北近江':['磯野','遠藤','雨森','海北'],
+ '越前':['朝倉','富田','真柄','魚住'],
+ '相模':['大道寺','松田','笠原','遠山'],
+ '丹波':['赤井','荻野','内藤','籾井']
+};
+function surnameBestowal(){
+ const old=familyName(s.name),given=String(s.name).trim().split(/[\s　]+/).slice(1).join(' ')||'太郎';
+ let pool=(bestowedSurnames[s.region]||['小寺','蒲生','朽木','花房']).filter(n=>n!==old&&n!==(s.clan||'').replace(/家$/,''));
+ const bestowed=P(pool.length?pool:['小寺','蒲生','朽木']);
+ return scene('名字の下賜','主君より呼び出しがあった。\n「あなたの長年の忠勤、見事である。由緒ある「'+bestowed+'」の名字を授けよう」\n\n先祖から受け継いだ「'+old+'」の名字を守るか、新たな名誉を受け入れるか。',[
+  opt('ありがたく「'+bestowed+'」の名字を拝領する','主君の信頼と魅力が上がる',()=>{s.birthName=s.birthName||s.name;s.name=bestowed+' '+given;s.surnameBestowalDone=true;s.trust+=5;mod('魅力',5);s.reputation.push('名字拝領');if(s.rank==='大名')s.clan=bestowed+'家';if(!Array.isArray(s.achievements))s.achievements=[];s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'改姓',summary:old+'から'+bestowed+'の名字を賜った'});queueMilestone('名字の下賜 ― '+bestowed+'家','主君から「'+bestowed+'」の名字を授かった。\n'+old+' '+given+'は、これより'+s.name+'と名乗る。');return '主君の厚意を受け、新たに'+s.name+'と名乗ることとなった。'}),
+  opt('先祖伝来の名字を守る','名字は変わらない',()=>{s.surnameBestowalDone=true;s.trust=Math.max(0,s.trust-1);return '礼を尽くして辞退し、「'+old+'」の名字を守った。'}),
+  opt('名字ではなく恩賞を願い出る','交渉次第で財産を得る',()=>{s.surnameBestowalDone=true;if(R(1,100)<=Math.min(85,30+s.stats.魅力)){mod('財産',R(4,9));s.trust=Math.max(0,s.trust-2);return '主君は苦笑しながらも恩賞を与えた。'}s.trust=Math.max(0,s.trust-5);return '主君の機嫌を損ね、願いは退けられた。'})
+ ]);
+}
+// 家中の権力関係。旧セーブでは未設定のままでよい。
+function clearHousePower(){s.housePower=null;}
+function gainHouseHead(route){
+ s.rank='家中筆頭';s.housePower={holder:'self',clan:s.clan,origin:route};
+ s.trust=Math.max(10,s.trust||0);mod('魅力',R(2,4));
+ s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'権力掌握',summary:s.clan+'の家中筆頭となり、主君を残して軍政の実権を握った'});
+ note(s.clan+'の家中筆頭となり、家中の実権を掌握した。');
+ return '名目上の当主はそのままだが、軍事と政務の決定権はあなたに移った。あなたは'+s.clan+'の家中筆頭（実権掌握）となった。';
+}
+// 謀反後、父・叔父または旧友が権力を握った場合の次の選択。
+function powerStruggleScene(){
+ const kin=s.housePower&&s.housePower.holder==='family';
+ const other=kin?'父と叔父':'旧友';
+ return scene(kin?'家中の実権 ― 一族の継承':'家中の実権 ― 旧友との対立',
+  other+'が'+s.clan+'の実権を握っている。主君は名目上の当主として残っているが、家中の決定は'+other+'が下す。あなたを新たな実力者に推す者も現れた。',[
+  opt(kin?'一族の支持を集め、実権の継承を求める':'旧友を追い落とし、家中の実権を奪う','知略・魅力で判定／失敗すると立場を失う',()=>{
+   const chance=Math.max(12,Math.min(88,Math.round(24+(s.stats.知略+s.stats.魅力)*.31+(kin?10:0))));
+   if(R(1,100)<=chance)return '【成功・'+chance+'％】'+gainHouseHead(kin?'一族の継承':'旧友からの権力奪取');
+   s.trust=Math.max(0,(s.trust||0)-R(5,9));mod('魅力',-R(2,5));
+   if(!kin&&R(1,100)<=22){const former=s.clan;markFailedRebellion(former,'旧友からの実権奪取',s.rank);s.previousService={clan:former,rank:s.rank,year:birthYear()+s.age,reason:'実権奪取失敗'};s.rank='浪人';s.clan=null;clearHousePower();return '【失敗・'+chance+'％】旧友は先手を打ち、あなたを家中から追放した。浪人となった。';}
+   return '【失敗・'+chance+'％】'+other+'の支持は厚く、実権を奪えなかった。家中での信用も落ちた。';
+  }),
+  opt(kin?'父と叔父を支え、一族の結束を守る':'旧友を支え、家中の重臣として働く','財産・信頼が増える／実権はそのまま',()=>{s.trust=(s.trust||0)+R(2,4);mod('財産',R(2,5));return other+'を支え、家中の安定に尽くした。'+other+'は引き続き実権を握っている。';}),
+  opt('表立った争いを避け、機会を待つ','知略が上がる／実権はそのまま',()=>change({知略:R(1,3)},'家中の動向を見極め、今は争いを避けた。'))
+ ]);
+}
+// 家中筆頭のみが選べる、主家そのものの乗っ取り。
+function houseUsurpationScene(){
+ const former=s.clan,castle=(s.region||'近隣')+'城';
+ return scene('下剋上 ― 主家の乗っ取り',former+'の当主は名目上の地位を保っている。しかし軍政の実権は家中筆頭であるあなたの手にある。いまこそ主君に代わり大名となるか、それとも家を支え続けるか。',[
+  opt('主君を追放し、自ら大名となる','知略・武勇で判定／失敗すれば打首の危険',()=>{
+   const chance=Math.max(10,Math.min(90,Math.round(27+(s.stats.知略+s.stats.武勇)*.32)));
+   mod('健康',-R(2,6));
+   if(R(1,100)<=chance){s.overthrownClans=s.overthrownClans||[];if(!s.overthrownClans.includes(former))s.overthrownClans.push(former);clearHousePower();return '【成功・'+chance+'％】'+former+'は大名としての地位を失った。'+becomeDaimyo(castle,'主家乗っ取り');}
+   if(R(1,100)<=45){s.alive=false;s.cause='家中筆頭として主家の乗っ取りを図り、失敗して打首となった。';return '【失敗・'+chance+'％】反対派に捕らえられ、謀反の罪で打首となった。';}
+   markFailedRebellion(former,'主家乗っ取り',s.rank);s.previousService={clan:former,rank:s.rank,year:birthYear()+s.age,reason:'主家乗っ取り失敗'};s.rank='浪人';s.clan=null;clearHousePower();return '【失敗・'+chance+'％】主君の反撃に敗れ、主家を追われ浪人となった。';
+  }),
+  opt('主君を残し、家中筆頭として統治を続ける','家中筆頭を維持／信頼が上がる',()=>{s.trust=(s.trust||0)+3;return '当主を立てながら、軍事と政務を取り仕切り続けた。';}),
+  opt('反対派の家臣と和議を結ぶ','魅力＋／財産－／家中筆頭を維持',()=>change({魅力:R(2,5),財産:-R(2,4)},'反対派にも所領と役目を認め、家中の対立を和らげた。'))
+ ]);
+}
+// 家中の謀反：出生した家柄によって首謀者の関係を切り替える。
+function rebellionKin(){return ['下級武家','有力武家'].includes(s.house)}
+function rebellionPlot(){
+ s.seen.rebellionPlot=true;
+ const kin=rebellionKin(),actors=kin?'父と叔父':'旧知の戦友たち';
+ const intro=kin?
+  '父と叔父が密かに兵を集め、主君への謀反を企てていることを知った。幼い頃から頼りにしてきた二人は、あなたにも一族のために立つよう求めている。主君への忠義と肉親への情の間で、胸が締めつけられる。':
+  '幾度も戦場で命を預け合った旧知の戦友たちが、主君への謀反を企てていると打ち明けてきた。彼らはあなたにも加わるよう求めている。かつての仲間を取るか、主君への忠義を守るか。';
+ return scene('家中の謀反 ― 忠義と情',intro+hostageRebellionWarning(),[
+  opt(kin?'父と叔父に従い、謀反に加担する':'戦友たちに従い、謀反に加担する','謀反軍に参加／人質が処刑される危険／主君軍と交戦',()=>{const hostageFate=resolveHostageRebellion();s.pendingRebellionSide='rebel';s.trust=Math.max(0,(s.trust||0)-4);return actors+'と行動を共にする決意を固めた。兵が動き出し、もはや後戻りはできない。主君の軍勢との戦いが迫っている。'+hostageFate;}),
+  opt('主君への忠義を守り、加担を拒む','密告はしない／謀反が起こり、主君側で戦う',()=>{s.pendingRebellionSide='loyal';mod('魅力',-R(1,3));return actors+'の誘いを断った。しかし企てを主君に告げることはできなかった。ほどなく挙兵の報せが届き、あなたは主君の軍勢に加わる。'}),
+  opt('謀反の企てを主君に密告する','挙兵前に首謀者を処罰／褒美・信頼を得る',()=>{let money=R(5,11);mod('財産',money);s.trust=(s.trust||0)+R(7,12);s.merit=(s.merit||0)+2;mod('魅力',kin?-R(3,6):-R(1,3));s.rebellionOutcome='reported';s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'忠節',summary:'謀反の企てを主君に密告し、挙兵を未然に防いだ'});return '主君は直ちに兵を差し向け、'+actors+'を捕らえた。首謀者たちは謀反の罪で処罰され、挙兵は未然に防がれた。あなたには忠節を賞して褒美が与えられた。'+(kin?'だが、父と叔父を告発した痛みは消えない。':'かつての戦友を告発した苦さが胸に残る。')})
+ ]);
+}
+function rebellionBattleScene(side){
+ const rebel=side==='rebel',kin=rebellionKin();
+ const intro=rebel?
+  (kin?'父と叔父の旗の下に兵が集まった。':'旧知の戦友たちと共に兵を挙げた。')+'主君の討伐軍が迫り、両軍が野に布陣する。謀反の成否はこの一戦にかかっている。':
+  (kin?'父と叔父の軍勢が挙兵した。':'旧知の戦友たちが挙兵した。')+'あなたは密告せず主君の側に立った。かつて親しかった者たちが敵陣にいる。ついに両軍が向かい合った。';
+ return scene('謀反の戦 ― '+(rebel?'反乱軍':'主君軍'),intro,[
+  opt('兵を率いて正面から戦う','武勇が勝敗に影響／負傷・討死の危険',()=>rebellionBattleResult(side,'assault')),
+  opt('陣形を守り、味方を支える','守りを重視／負傷の危険は比較的小さい',()=>rebellionBattleResult(side,'guard')),
+  opt('敵軍の隙を見極めて兵を動かす','知略が勝敗に影響／策が裏目に出る危険',()=>rebellionBattleResult(side,'tactic'))
+ ]);
+}
+function rebellionBattleResult(side,style){
+ s.rebellionBattleActive=false;
+ s.lastBattleAge=s.age;
+ const rebel=side==='rebel',kin=rebellionKin();
+ const ability=style==='tactic'?s.stats.知略:style==='assault'?s.stats.武勇:s.stats.魅力;
+ const winChance=Math.max(16,Math.min(88,Math.round(37+ability*.43+(style==='guard'?8:style==='tactic'?3:0)+(rebel?-5:5))));
+ const victory=R(1,100)<=winChance;
+ const harm=style==='assault'?R(5,12):style==='tactic'?R(3,8):R(1,5);
+ mod('健康',-harm);
+ s.lastArmyResult=victory?'勝利':'敗北';
+ s.armyWins=(s.armyWins||0)+(victory?1:0);
+ s.armyLosses=(s.armyLosses||0)+(victory?0:1);
+ let result='【謀反の戦：'+(victory?'勝利':'敗北')+'／勝率'+winChance+'％】';
+ if(rebel&&victory){
+  s.rebellionOutcome='rebelVictory';s.merit=(s.merit||0)+R(3,6);s.trust=R(3,9);
+  mod('財産',R(4,9));mod('武勇',R(1,3));
+  s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'謀反',summary:'謀反に加わって勝利し、主家の実権交代に関与した'});
+  const formerRank=s.rank;
+  // 家臣以下は重臣に昇格。武家出身の重臣なら自ら家中筆頭となる。
+  // 旧友が首謀者の場合は、主人公が重臣でも旧友が実権を握る。
+  if(kin&&formerRank==='重臣'){
+   const head=gainHouseHead('父・叔父と共に起こした謀反');
+   return result+'反乱軍が主君の軍勢を破った。旧主は当主の座を保ったまま実権を失い、父と叔父の支持を受けたあなたが家中を掌握した。'+head;
+  }
+  s.rank='重臣';s.housePower={holder:kin?'family':'friend',clan:s.clan,origin:'家中の謀反'};
+  s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'昇進',summary:'謀反後の新体制で重臣となった'});
+  return result+'反乱軍が主君の軍勢を破った。旧主は名目上の当主として残ったが、'+(kin?'父と叔父':'旧友')+'が家中の実権を握った。あなたは功績を認められ、'+s.clan+'の重臣に取り立てられた。';
+ }
+ if(rebel&&!victory){
+  s.rebellionOutcome='rebelDefeat';s.trust=0;
+  if(R(1,100)<=24){s.alive=false;s.cause='謀反に加担し、敗戦後に捕らえられて処刑された。';return result+'反乱軍は敗れ、首謀者たちは処罰された。あなたも捕縛され、謀反人として打首となった。';}
+  const former=s.clan;markFailedRebellion(former,'家中の謀反',s.rank);s.previousService={clan:former,rank:s.rank,year:birthYear()+s.age,reason:'家中の謀反失敗'};s.rank='浪人';s.clan=null;mod('財産',-R(5,12));mod('魅力',-R(3,6));
+  return result+'謀反は鎮圧され、'+(kin?'父と叔父':'戦友たち')+'は処罰された。あなたは辛うじて落ち延びたが、主家を追われ浪人となった。';
+ }
+ if(!rebel&&victory){
+  s.rebellionOutcome='loyalVictory';s.merit=(s.merit||0)+R(2,5);s.trust=(s.trust||0)+R(4,8);mod('財産',R(3,7));
+  s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'忠節',summary:'謀反の戦で主君の軍勢に加わり、鎮圧に功を立てた'});
+  return result+'主君軍は反乱軍を破った。'+(kin?'父と叔父':'戦友たち')+'は捕らえられ、謀反の罪で処罰された。あなたは主君への忠義を貫き、戦功に応じた恩賞を受けた。';
+ }
+ s.rebellionOutcome='loyalDefeat';s.trust=Math.max(0,(s.trust||0)-R(3,7));
+ if(R(1,100)<=12){s.alive=false;s.cause='謀反の鎮圧戦に敗れ、戦場で討死した。';return result+'主君軍は敗走し、あなたは退却を助ける中で討死した。';}
+ if(R(1,100)<=42){s.rank='浪人';s.clan=null;return result+'主君軍は敗れ、旧主は城を追われた。あなたも居場所を失い、浪人となって落ち延びた。';}
+ return result+'主君軍は敗れ、謀反軍が城を掌握した。あなたは辛くも生き延びたが、家中での立場を失い、信頼も大きく損なわれた。';
+}
+function openRebellionBattle(){
+ const side=s.pendingRebellionSide;
+ if(!side)return false;
+ s.pendingRebellionSide=null;
+ s.rebellionBattleActive=true;
+ e=rebellionBattleScene(side);
+ s.rebellionBattleSide=side;
+ s.scene={title:e.title,text:e.text};s.phase='event';
+ renderScene();save();return true;
+}
+function careerChoice(){
+ const farmer=s.house==='百姓';
+ const choices=[];
+ const enlist=(clan)=>opt((s.region==='信濃'?clan+'に仕える道を選ぶ':'武家に仕える道を選ぶ'),'足軽として仕官を目指す／戦場の危険あり',()=>{s.careerChosen=true;s.local=historicalSuccessor(clan,birthYear()+s.age);let chance=Math.min(90,45+Math.floor((s.stats.魅力+s.stats.武勇)/3));if(R(1,100)<=chance){s.clan=s.local;s.rank='足軽';return s.local+'に召し抱えられ、足軽として武家の道を歩み始めた。'}s.seen.seek=true;return '武家への仕官を望んだが、すぐには召し抱えられなかった。引き続き仕官先を探すことにした。'});
+ if(s.region==='信濃'){choices.push(enlist('武田家'));choices.push(enlist('長尾家'));}else choices.push(enlist(s.local));
+ if(farmer){
+  choices.push(opt('百姓として田畑を守る','百姓の暮らしを続ける',()=>{s.rank='百姓';s.careerChosen=true;note('百姓として生きる道を選んだ。');return '家族と田畑を守り、百姓として生きていくことを決めた。'}));
+ }
+ choices.push(opt('商人として生きる','商いで身を立てる／財産収入1.2倍',()=>{s.rank='小商人';s.merchantLevel=0;s.tradeMerit=s.tradeMerit||0;s.careerChosen=true;note('商人として生きる道を選んだ。');return farmer?'田畑を離れ、商いの世界へ踏み出した。小さな商売から始めることとなった。':'家業を継ぎ、商人として歩み始めた。'}));
+ return scene('人生の選択 ― どの道を歩むか',farmer?'十五歳となった。武家に仕えて武功を立てるか、商人として財を築くか、百姓として田畑を守るか。これからの生き方を決める時が来た。':'十五歳となった。家業を継いで商人となるか、武家に仕えて武功を求めるか。これからの生き方を決める時が来た。',choices);
+}
+function hereditaryWarriorFirstBattle(){
+ // 武家の子は兵の募集に応募せず、父と伯父に従って初陣を迎える。
+ // 武家出身者の主家は生まれた時点で家の所属として決まっている。
+ // 信濃では武田家・長尾家のどちらかが出生時にランダムで選ばれる。
+ s.local=historicalSuccessor(s.local,birthYear()+s.age);
+ s.clan=s.local;
+ s.rank='足軽大将';
+ s.warriorFirstBattle=true;
+ s.pendingBattle=true;
+ s.careerChosen=true;
+ s.seen.warriorFirstService=true;
+ note('父と叔父に従い、'+s.clan+'の足軽大将として初陣に臨んだ。');
+ if(!Array.isArray(s.achievements))s.achievements=[];
+ s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'仕官',summary:'父と叔父に従い、'+s.clan+'の足軽大将として初陣に臨んだ'});
+ queueMilestone('武家として初陣へ ― 足軽大将',
+  '父と叔父に従い、'+s.clan+'の軍勢に加わった。\n'+
+  '生まれながらに武家の務めを負う身として、足軽大将の役目を任された。\n'+
+  '初陣の緊張を胸に、二人の指揮を補佐する。');
+ return soldier();
+}
+// 家督譲渡：50歳から5年ごと。主人公は代替わりせず生涯同じ人物。
+function heirForSuccession(){
+ if(s.heirSon&&s.heirSon.alive!==false)return s.heirSon;
+ // 旧版のセーブデータには子の生年・性別がない。成人した子がいる場合に限り、後継男子として補完する。
+ if(!Object.prototype.hasOwnProperty.call(s,'heirSon')&&(s.children||0)>0&&s.age>=50){s.heirSon={name:'嫡男',born:birthYear()+Math.max(20,s.age-22),alive:true,legacy:true};return s.heirSon}
+ return null;
+}
+function successionEligible(){
+ if(s.successionMode||s.successionPromptedYear===birthYear()+s.age||s.age<50||s.age%5!==0||!s.clan||!['家臣','重臣','家中筆頭','大名'].includes(s.rank))return false;
+ const son=heirForSuccession();return !!(son&&son.alive&&birthYear()+s.age-son.born>=15);
+}
+function successionScene(){
+ const son=heirForSuccession();s.successionPromptedYear=birthYear()+s.age;
+ const urging=s.age>=70?'家中からは、これ以上家督を譲らぬのは無理があるとの声が強まっている。':s.age>=60?'家族や家臣が、そろそろ次代へ家督を渡してはどうかと繰り返し勧めてくる。':'家臣たちから、そろそろ嫡男へ家督を譲ってはどうかとの話が持ち上がった。';
+ return scene('家督を譲る時',s.age+'歳となったあなたには、成人した'+son.name+'がいる。\n'+urging+'\n\nあなたはどうするか。',[
+  opt('家督も実権も息子に譲り、隠居する','完全隠居／主人公の人生は続く',()=>{s.successionMode='full';s.successionYear=birthYear()+s.age;s.retired=true;note(son.name+'へ家督と実権を譲り、隠居した。');return son.name+'に家督と実権をすべて譲った。以後、家の采配は息子に任せ、あなたは先代として暮らす。';}),
+  opt('家督は譲るが、実権は自分が握る','大御所／息子に命令できる',()=>{s.successionMode='regent';s.successionYear=birthYear()+s.age;s.retired=true;note(son.name+'に家督を譲ったが、実権は引き続き握った。');return son.name+'が表向きの当主となった。だが家中の実権はなおあなたの手にある。';}),
+  opt('まだ家督は譲らない','5年後に再び検討',()=> '今は自ら家を率いると決めた。家臣たちは次の機会を待つことになった。')
+ ]);
+}
+function retiredLifeScene(){
+ const son=heirForSuccession();const name=son&&son.alive?son.name:'後継者';
+ const scenes=[
+  ()=>scene('隠居の暮らし','家督を譲ってから、あなたの暮らしは静かになった。'+name+'は当主として家を治めている。',[opt('息子の近況を聞く','家族との交流／魅力＋',()=>{mod('魅力',1);return '使いの者から家中の様子を聞いた。時代は少しずつ次の世代へ移っている。'}),opt('昔の家臣と語らう','旧交を温める／知略＋',()=>{mod('知略',1);return '古い戦友と、かつての戦の思い出を語り合った。'}),opt('静かに養生する','健康＋',()=>{heal(R(2,5));return '庭を眺めながら、穏やかな一日を過ごした。'})]),
+  ()=>scene('先代への相談',name+'から使いが来た。領内の揉め事について、先代の考えを聞きたいという。最終的な判断は当主にある。',[opt('穏便な解決を勧める','助言／魅力＋',()=>{mod('魅力',1);return 'あなたは争いを収めるよう助言した。息子がどう判断するかは、息子自身に委ねた。'}),opt('厳しく対処するよう勧める','助言／知略＋',()=>{mod('知略',1);return 'あなたは家の規律を守るよう助言した。判断は当主に任せた。'}),opt('当主の裁量に任せる','干渉しない',()=> '先代として口出しを控え、息子の成長を見守った。')])
+ ];return P(scenes)();
+}
+function overseasSuccessionScene(h,prefix){
+ const son=heirForSuccession(),name=son&&son.alive?son.name:'息子',regent=s.successionMode==='regent';
+ const sailSelf=()=>{if(risk(5+(s.age>=70?3:0),'朝鮮出兵の渡海中、船の遭難により命を落とした。'))return '【水難事故】船団が荒天に遭い、あなたの乗った船が沈没した。';mod('健康',-R(3,8));return 'あなたは老身を押して渡海した。荒波を越え、遠征の苦難を経験した。';};
+ const sailSon=()=>{if(!son||!son.alive)return '出陣できる息子はいなかった。';if(R(1,100)<=3){son.alive=false;s.heirSon=son;note(name+'が朝鮮出兵の渡海中、船の遭難で亡くなった。');return '【悲報】'+name+'の乗った船が遭難した。息子は帰らぬ人となった。あなたは生き残ったが、家に深い悲しみが残った。';}return name+'は海を渡り、遠征に加わった。あなたは国内で帰還を待つことになった。';};
+ const options=regent?[
+  opt('自ら朝鮮へ出陣する','本人が渡海／水難事故で死亡する危険',sailSelf),
+  opt('息子に出陣を命じ、自分は残る','息子が渡海／息子に水難事故の危険',sailSon),
+  opt('息子も自分も国内に残る','渡海を見送る／出兵要請への対応',()=>{mod('財産',-R(1,3));return 'あなたは渡海を見送り、息子にも国内の守りを命じた。出兵への対応には苦心した。'}),
+  opt('出兵の判断を息子に任せる','息子が出陣する場合は水難事故の危険',()=>R(1,100)<=55?sailSon():'息子は国内に残り、兵站と領地の守りを優先した。')
+ ]:[
+  opt('息子に出陣を勧める','助言／息子が出陣する場合は水難事故の危険',()=>R(1,100)<=70?'助言を聞いた息子は出陣を決めた。\n'+sailSon():'息子はあなたの助言を聞いたが、国内に残ることを選んだ。'),
+  opt('息子に出陣しないよう勧める','助言／最終判断は息子',()=>R(1,100)<=70?'息子は助言を受け入れ、国内に残った。':'息子はあなたの助言に感謝したが、自ら出陣を決めた。\n'+sailSon()),
+  opt('自分が出陣すると申し出る','本人が渡海／水難事故で死亡する危険',()=>R(1,100)<=80?sailSelf():'息子は老いたあなたの身を案じ、出陣を固く断った。'),
+  opt('息子の判断にすべて任せる','息子が出陣する場合は水難事故の危険',()=>R(1,100)<=55?sailSon():'息子は国内に残る判断を下した。あなたはその決断を尊重した。')
+ ];
+ return scene(h.title+' ― 家督を譲った後の出兵',prefix+'朝鮮への出兵が命じられた。家督を譲った'+name+'が対応を考えている。\n'+(regent?'家中の実権は今なおあなたにあり、息子に命じることができる。':'家中の実権は息子にある。あなたにできるのは助言であり、最終的には息子が決める。')+'\n\n渡海には遭難の危険がある。あなたはどうするか。',options);
+}
+function choose(){if(s.villageRaidYear&&!s.villageRaidDone&&birthYear()+s.age>=s.villageRaidYear)return villageRaidScene();if(s.pendingCivilianChoice){s.pendingCivilianChoice=false;return leaveWarriorLife();}if(s.age<=14)return child();if(successionEligible())return successionScene();if(s.successionMode==='full')return retiredLifeScene();if(hostageEligible()&&R(1,100)<=18)return hostageEvent();if(lordAdoptedDaughterEligible()&&R(1,100)<=10)return lordAdoptedDaughterScene();if(s.age>=15&&!s.clan&&!s.seen.firstBattle&&['下級武家','有力武家'].includes(s.house))return hereditaryWarriorFirstBattle();if(s.age>=15&&!s.careerChosen&&!s.clan&&['百姓','商家'].includes(s.house)&&['百姓','商家'].includes(s.rank))return careerChoice();if(foreignInvitationChance())return foreignInvitation();if(s.clan&&s.housePower&&s.housePower.clan===s.clan&&s.housePower.holder!=='self'&&s.rank==='重臣'&&R(1,100)<=26)return powerStruggleScene();if(s.clan&&['家臣','重臣'].includes(s.rank)&&s.age>=22&&!s.seen.rebellionPlot&&R(1,100)<=9)return rebellionPlot();if(s.clan&&['家臣','重臣'].includes(s.rank)&&s.age>=22&&!s.surnameBestowalDone&&s.trust>=10&&s.merit>=8&&R(1,100)<=12)return surnameBestowal();if(s.age>=50&&R(1,100)<=(s.age>=80?46:s.age>=70?36:s.age>=60?27:19)+(s.body==='病弱'?8:s.body==='丈夫'?-5:0))return elderIllness();if(!s.spouse&&s.age>=18&&s.age<=55&&R(1,100)<=12)return family();if(s.spouse&&s.children<4&&s.age>=20&&s.age<=50&&R(1,100)<=11){ensureChildRecords();s.children++;const baby=makeChildRecord();s.childRecords.push(baby);if(baby.gender==='男'&&!s.heirSon)s.heirSon=baby;return scene('家族が増えた','家に'+(baby.gender==='男'?'息子':'娘')+'の'+baby.name+'が生まれた。あなたの暮らしにも新たな責任が生まれる。',[opt('子の成長を見守る','家族の出来事として記録',()=> '子は家族に見守られながら育っていく。')])}if(!s.clan&&s.age>=15&&['百姓','小商人','商家の当主','豪商','御用商人'].includes(s.rank)&&R(1,100)<=(s.rank==='百姓'?8:4))return civilianLevy();if(!s.clan&&s.age>=15&&['小商人','商家の当主','豪商','御用商人'].includes(s.rank))return merchantLife();if(!s.clan&&s.age>=15&&R(1,100)<=12)return banditRaid();if(!s.clan&&s.rank!=='浪人'&&!s.abandonedWarrior&&(s.seen.seek||R(1,100)<=(s.rank==='百姓'?18:32))){s.seen.seek=false;return recruitment()}if(s.rank==='浪人')return wander();if(s.clan)return soldier();return civilian()}
+function honnojiAttackScene(){
+ return scene('本能寺の変 ― 明智軍の襲撃','天正十年六月二日、未明。明智光秀の軍勢が本能寺を取り囲んだ。\n「敵は本能寺にあり」の声が響き、寺の周囲はたちまち戦場となった。\n信長公はこの襲撃で命を落とす。あなたはどう行動するか。',[
+  opt('信長公を守るため最後まで戦う','武勇で判定／討死の危険が非常に高い',()=>{
+   s.pendingHonnojiAttack=false;
+   if(risk(38,'本能寺の変で明智軍と戦い、討死した。'))return '信長公を守って戦ったが、明智勢に討たれた。';
+   mod('健康',-R(5,13));s.merit=(s.merit||0)+3;return '明智軍と激戦を繰り広げ、傷を負いながら本能寺を脱出した。信長公は本能寺で自害した。';
+  }),
+  opt('寺から脱出し、織田家中に急を知らせる','知略で判定／討死の危険',()=>{
+   s.pendingHonnojiAttack=false;
+   if(risk(14,'本能寺の変で明智軍に討たれた。'))return '脱出を試みたが、明智勢に捕らえられ討たれた。';
+   mod('知略',R(1,3));return '裏手から逃れ、急報を伝えた。だが信長公の死は避けられなかった。';
+  }),
+  opt('負傷した者を連れて逃れる','魅力で判定／負傷の危険',()=>{
+   s.pendingHonnojiAttack=false;
+   if(risk(9,'本能寺の変で明智軍に討たれた。'))return '負傷者をかばったところを討たれた。';
+   mod('魅力',R(1,3));mod('健康',-R(1,5));return '負傷者を助けて寺を離れた。やがて信長公討死の報が届いた。';
+  })]);
+}
+// 敗戦後の切腹命令・落城や大敗での自害の決断。既存の打首判定とは別枠。
+function postDefeatScene(){
+ const p=s.pendingDefeatDecision;
+ if(!p)return choose();
+ const clan=p.clan||s.clan||'旧主家';
+ if(p.type==='seppuku')return scene('敗戦の責任 ― 切腹命令',
+  '合戦に敗れ、多くの兵を失った。\n\n'+clan+'の主君は指揮官であったあなたの責任を重く見て、切腹を命じた。\n\n家臣たちは静まり返り、あなたの決断を待っている。',[
+  opt('命令に従い、切腹する','人生終了／敗戦の責任を負う',()=>{s.pendingDefeatDecision=null;s.alive=false;s.cause='合戦に敗れ、主君の切腹命令に従って切腹した。';return '主君の命を受け入れ、敗戦の責任を負って切腹した。';}),
+  opt('主君に許しを請う','魅力・知略・主君の信頼で助命判定',()=>{
+   s.pendingDefeatDecision=null;
+   const chance=Math.max(8,Math.min(88,15+Math.floor(s.stats.魅力*.35)+Math.floor(s.stats.知略*.20)+Math.floor((s.trust||0)*.55)));
+   if(R(1,100)<=chance){s.trust=Math.max(0,(s.trust||0)-R(5,10));mod('財産',-R(2,6));return '【助命成功・'+chance+'％】必死の嘆願が聞き入れられ、切腹は免れた。しかし知行を削られ、主君の信頼を失った。';}
+   s.alive=false;s.cause='敗戦の責任による切腹命令を受け、助命が認められず切腹した。';return '【助命失敗・'+chance+'％】嘆願は聞き入れられず、切腹を命じられた。';
+  }),
+  opt('命令を拒み、逃亡する','知略・武勇で逃亡判定／失敗すると打首',()=>{
+   s.pendingDefeatDecision=null;
+   const chance=Math.max(10,Math.min(85,18+Math.floor(s.stats.知略*.42)+Math.floor(s.stats.武勇*.22)));
+   if(R(1,100)<=chance){const old=s.clan;s.clan=null;s.rank='浪人';s.trust=0;s.pendingBattle=false;clearHousePower();mod('財産',-R(4,10));s.previousService={clan:old,rank:p.rank,year:birthYear()+s.age,reason:'切腹命令からの逃亡'};return '【逃亡成功・'+chance+'％】追手を振り切り、主家を捨てて浪人となった。';}
+   s.alive=false;s.cause='切腹命令に背いて逃亡を図り、捕縛され打首となった。';return '【逃亡失敗・'+chance+'％】逃亡の途中で捕縛され、主君の命により打首となった。';
+  })]);
+ const castle=p.castle;
+ return scene(castle?'落城の危機 ― 最後の決断':'大敗の果て ― 最後の決断',
+  (castle?'城は落ち、敵兵が迫っている。':'味方は大敗し、退路は敵軍に断たれかけている。')+'\n\nあなたは追い詰められた。ここで命を絶つか、最後まで生き延びる道を探すか。',[
+  opt('自害して最期を迎える','人生終了／自ら最期を決める',()=>{s.pendingDefeatDecision=null;s.alive=false;s.cause=castle?'落城に際して自害した。':'合戦で大敗し、追い詰められて自害した。';return castle?'落城を前に、自ら命を絶った。':'敗走の末、自ら命を絶った。';}),
+  opt('敵の包囲を突破して逃れる','武勇・知略で判定／負傷や討死の危険',()=>{
+   s.pendingDefeatDecision=null;
+   const chance=Math.max(12,Math.min(88,22+Math.floor(s.stats.武勇*.38)+Math.floor(s.stats.知略*.28)));
+   if(R(1,100)<=chance){mod('健康',-R(3,9));return '【脱出成功・'+chance+'％】傷を負いながらも敵の包囲を突破し、生き延びた。';}
+   if(R(1,100)<=45){s.alive=false;s.cause=castle?'落城の際、敵の包囲を突破できず討死した。':'大敗後の敗走中に討死した。';return '【脱出失敗・'+chance+'％】敵の追撃を振り切れず、討死した。';}
+   mod('健康',-R(8,16));mod('財産',-R(2,6));return '【脱出失敗・'+chance+'％】敵に追われて深手を負ったが、辛うじて命をつないだ。';
+  }),
+  opt('降伏し、助命を願う','魅力・知略で判定／捕縛・処刑の危険',()=>{
+   s.pendingDefeatDecision=null;
+   const chance=Math.max(12,Math.min(85,24+Math.floor(s.stats.魅力*.36)+Math.floor(s.stats.知略*.22)));
+   if(R(1,100)<=chance){mod('財産',-R(4,9));return '【助命成功・'+chance+'％】武具を捨てて降伏し、命だけは助けられた。財産の多くを失った。';}
+   if(R(1,100)<=38){s.alive=false;s.cause='敗戦後に降伏したが、捕縛され打首となった。';return '【助命失敗・'+chance+'％】降伏は受け入れられず、捕縛され打首となった。';}
+   mod('財産',-R(6,12));mod('健康',-R(2,6));return '【助命失敗・'+chance+'％】厳しい処遇を受けたが、命は助かった。';
+  })]);
+}
+// 少年期に一度だけ発生する鉄砲との出会い。史実の1543年イベントとは独立。
+function gunPending(){
+ if(!s||s.gunSeen||s.age<6||s.age>15)return false;
+ if(!Number.isInteger(s.gunAge))s.gunAge=R(Math.max(6,s.age),15);
+ return s.age===s.gunAge;
+}
+function childhoodGunScene(){
+ return scene('初めて鉄砲を見た','【少年期の出来事】\n領内に、遠方から伝わったという「鉄砲」が持ち込まれた。火薬を使って遠くの的を撃ち抜く新たな武器だ。\n\n'+s.age+'歳のあなたは、目の前で響く轟音と煙に驚いた。',[
+  opt('鉄砲の仕組みを詳しく尋ねる','知略＋',()=>{mod('知略',R(3,5));return '火薬と弾丸の仕組みを学んだ。戦の姿が変わるかもしれない。'}),
+  opt('撃つところを間近で見せてもらう','武勇＋／健康－',()=>{mod('武勇',R(2,4));mod('健康',-1);return '轟音に驚きながらも、威力を目に焼き付けた。'}),
+  opt('家族に見たことを伝える','魅力＋',()=>{mod('魅力',R(2,4));return '珍しい武器の話に、家族も驚いた。'})
+ ]);
+}
+function nextEvent(){
+ if(!s||!s.alive)return;
+ // 一年につきイベントは一回だけ。
+ if(s.eventsThisYear>=1&&!(s.villageRaidYear&&!s.villageRaidDone&&birthYear()+s.age>=s.villageRaidYear)&&!s.pendingDefeatDecision&&!s.pendingHistoricalFall&&!pendingAttackFall()&&!s.pendingHonnojiAttack&&!nextNationalHistory()&&!successionEligible()&&!gunPending()){advance();return}
+ const historical=nextNationalHistory();
+ if(s.villageRaidYear&&!s.villageRaidDone&&birthYear()+s.age>=s.villageRaidYear){e=villageRaidScene()}else if(s.pendingDefeatDecision){e=postDefeatScene()}else if(s.pendingHonnojiAttack){e=honnojiAttackScene()}else if(s.pendingHistoricalFall){e=historicalFallScene()}else if(pendingAttackFall()){e=historicalAttackScene(pendingAttackFall())}else if(historical){s.activeNationalHistory=historical.id;e=nationalHistoryScene(historical)}else if(gunPending()){e=childhoodGunScene()}else if(s.pendingBattle){e=soldier()}else{e=choose()}
+ if(!s.pendingDefeatDecision&&!s.pendingHistoricalFall&&!s.activeNationalHistory&&!pendingAttackFall()&&!s.pendingHonnojiAttack&&s.age>=15&&s.phase!=='dead'&&e&&s.recentEvents&&s.recentEvents.some(y=>y.title===e.title&&s.age-y.age<3)&&!['縁談','家族が増えた','主君の養女 ― 栄達か、妻への情か','人質の要求 ― 忠誠の証','初陣への道 ― 足軽の募集','領主からの軍役動員','人生の選択 ― どの道を歩むか'].includes(e.title)){if(s.clan&&!s.pendingBattle&&e.title.indexOf('合戦')<0&&e.title.indexOf('初陣')<0)e=['足軽'].includes(s.rank)?extraScene('soldier'):peaceService();else if(!s.clan&&s.rank!=='浪人'&&e.title!=='野盗の襲撃')e=extraScene('civilian');}
+ if(!s.recentEvents)s.recentEvents=[];s.recentEvents.push({title:e.title,age:s.age});if(s.recentEvents.length>45)s.recentEvents.shift();
+ s.scene={title:e.title,text:e.text};s.phase=e.autoInfant?'infant':'event';renderScene();save();
+}
+function renderScene(){render();$('stage').textContent=s.phase==='dead'?'人生の終わり':(birthYear()+s.age)+'年'+(seasonName()?'・'+seasonName():'')+'の出来事';$('title').textContent=s.scene.title;$('narrative').textContent=s.scene.text;$('options').innerHTML='';$('result').classList.add('hidden');if(s.phase==='infant'){showInfant();return}if(s.phase==='result'){showResult();return}if(s.phase==='deathResult'){showDeathResult();return}if(s.phase==='dead'){showDeath();return}e.options.forEach((o,i)=>{let b=document.createElement('button');b.className='choice'+(o.endingChoice?' choice-ending':'');b.disabled=!o.ok();b.textContent=(i+1)+'．'+o.label;let d=document.createElement('small');d.textContent=(b.disabled?(s.stats.財産<=0&&needsFunds(o.label,o.desc)?'財産不足／':'条件不足／'):'')+o.desc;b.append(d);b.onclick=()=>resolve(i);$('options').append(b)})}
+function showInfant(){render();$('stage').textContent=(birthYear()+s.age)+'年・'+s.age+'歳';$('title').textContent='幼い日々';$('options').innerHTML='';$('result').classList.remove('hidden');$('outcome').textContent='まだ幼く、自ら大きな決断をする年齢ではない。';$('deltas').textContent='病気などの重大な出来事を除き、自動的に成長します。';$('next').textContent='翌年へ進む'}
+function resolve(i){if(s.phase!=='event'||!e)return;let o=e.options[i];if(!o||!o.ok())return;let before={...s.stats},beforeMerit=s.merit||0,beforeTrust=s.trust||0,beforeRank=s.rank,beforeClan=s.clan,beforeCastle=s.castle,wasFirst=!!s.seen.firstBattle;rememberHighestRank(beforeRank);let text=o.fn();if(!o.endingChoice)text+=maybeFamilyTragedy(beforeClan,beforeRank);if(e.title==='初めて鉄砲を見た')s.gunSeen=true;rememberHighestRank(s.rank);if(s.alive&&s.clan&&s.successionMode!=='full'&&e&&e.title&&!/他国からの(再度の)?調略/.test(e.title)&&e.title.indexOf('合戦')<0&&e.title.indexOf('初陣')<0&&!/^(敗戦の責任 ― 切腹命令|落城の危機 ― 最後の決断|大敗の果て ― 最後の決断)$/.test(e.title)&&o.label.indexOf('休')<0&&o.label.indexOf('養生')<0&&o.label.indexOf('静養')<0&&o.label.indexOf('退')<0){s.serviceCount=(s.serviceCount||0)+1;if(s.serviceCount%2===0){s.merit++;s.trust+=2;text+=s.rank==='大名'?' 家臣たちは領主の手腕を認め、家中の結束が強まった。':s.rank==='家中筆頭'?' 家中での采配が評価され、実権がさらに固まった。':' 日頃の奉公が主君に認められ、家中での評価が少し高まった。';}}let isFirst=!wasFirst&&!!s.seen.firstBattle;if(isFirst)text='【初陣の結果】'+text;// 成功した功績だけを伝記用に記録する。単なる選択や能力上昇は功績に数えない。
+if(!Array.isArray(s.achievements))s.achievements=[];
+let gained=(s.merit||0)-beforeMerit,rankChanged=beforeRank!==s.rank;
+let battleEvent=/初陣|合戦/.test(e.title||'');
+let stratagem=/策略成功/.test(text);
+let recruitSuccess=/内応の約束を取り付け|味方への転身を申し出/.test(text);
+let distinguished=battleEvent&&gained>=2;
+if(distinguished||stratagem||recruitSuccess){
+ let kind=recruitSuccess?'調略':stratagem?'軍略':'武功';
+ let summary=recruitSuccess?'他国武将の内応を取り付け、味方への転身を促した':stratagem?'戦場で策を成功させ、戦況を有利に導いた':gained>=4?'合戦で目覚ましい武功を立て、恩賞を受けた':'合戦で武功を立て、家中の評価を高めた';
+ s.achievements.push({age:s.age,year:birthYear()+s.age,kind,summary,merit:gained});
+}
+if(rankChanged&&s.clan&&['足軽大将','家臣','重臣','家中筆頭','大名'].includes(s.rank))s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'昇進',summary:s.rank+'に取り立てられた'});
+if(!beforeClan&&s.clan)s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'仕官',summary:s.clan+'に仕官した'});
+const nationalId=s.activeNationalHistory;
+ if(nationalId){nationalEventSeen()[nationalId]=true;s.activeNationalHistory=null;if(nationalId==='sekigahara'&&s.alive)applyHistoricalFalls(true);}
+ if(beforeClan&&beforeClan!==s.clan&&s.pendingHistoricalFall===null){const matched=nationalHistory.find(h=>h.year===birthYear()+s.age&&h.kind==='battle'&&h.clans.includes(beforeClan)&&['shikoku','odawara'].includes(h.id));if(matched)nationalEventSeen()[matched.id]=true;}
+ if(e.title!=='野盗の襲来 ― 守るべきもの'&&!nationalId&&!historicalFalls.some(h=>h.battle===e.title&&h.year===birthYear()+s.age)&&e.title!=='初めて鉄砲を見た'&&!s.pendingHonnojiAttack&&!/^(敗戦の責任 ― 切腹命令|落城の危機 ― 最後の決断|大敗の果て ― 最後の決断)$/.test(e.title)&&e.title!=='本能寺の変 ― 明智軍の襲撃'&&!(e&&historicalFalls.some(h=>h.title===e.title)))s.eventsThisYear++;
+ let delta=st.map(k=>{let d=s.stats[k]-before[k];return d?k+' '+(d>0?'+':'')+d:''}).filter(Boolean).join(' ／ ');s.result={text,delta,first:isFirst};note(e.title+'。'+text);s.phase=s.alive?'result':'deathResult';if(!s.alive){archive();showDeathResult()}else showResult();detectMilestone(beforeRank,beforeClan,beforeCastle);save()}
+function showResult(){render();$('stage').textContent='選択の結果';$('title').textContent=((s.result&&s.result.first)?'初陣 ― ':'')+s.scene.title+' — 結果';$('options').innerHTML='';$('result').classList.remove('hidden');$('outcome').textContent=s.result.text;$('deltas').textContent=s.result.delta||'能力値の変化なし';$('next').textContent='次へ進む'}
+function showDeathResult(){render();$('stage').textContent='選択の結果';$('title').textContent=((s.result&&s.result.first)?'初陣 ― ':'')+s.scene.title+' ― 死亡';$('narrative').textContent='この出来事で命を落としました。';$('options').innerHTML='';$('result').classList.remove('hidden');$('outcome').textContent='【死亡】'+s.result.text+'\n死因：'+s.cause;$('deltas').textContent=s.result.delta||'能力値の変化なし';$('next').textContent='生涯を振り返る';save()}
+function advance(){const beforeRank=s.rank,beforeClan=s.clan,beforeCastle=s.castle;rememberHighestRank(beforeRank);s.age++;applyHistoricalRenames(true);applyHistoricalFalls(true);applyToyotomiEmergence(true);prepareNationalHistory();s.eventsThisYear=0;s.seasonIndex=0;s.yearLimit=1;s.phase='event';s.scene=null;s.result=null;for(const k of ['武勇','知略','魅力'])if(s.age<=16)mod(k,R(0,1)+Math.floor(s.talent[k]/3));if(s.age>=48&&R(1,100)<=55)mod('武勇',-R(1,3));if(s.age>=60)mod('武勇',-R(0,2));if(s.age>=70){if(R(1,100)<=45)mod('健康',-R(1,3));if(s.stats.健康<35)heal(R(0,2))}else{let target=s.body==='病弱'?39:s.body==='丈夫'?48:44;if(s.stats.健康<target&&R(1,100)<=75)heal(Math.min(target-s.stats.健康,R(1,3)));else if(s.stats.健康>65&&R(1,100)<=30)mod('健康',-1)}if(s.rank==='浪人')mod('財産',-R(1,3));if(s.clan&&R(1,100)<=25)mod('健康',-R(1,2));if(s.age>=15&&s.age%3===0&&s.clan&&s.merit>=3&&s.rank==='足軽'){s.rank='足軽大将';note('武功が認められ、足軽大将に取り立てられた。');if(!Array.isArray(s.achievements))s.achievements=[];s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'昇進',summary:'足軽大将に取り立てられた'})}if(s.clan&&s.merit>=6&&s.rank==='足軽大将'){s.rank='家臣';note('さらに功績を重ね、家臣として取り立てられた。');if(!Array.isArray(s.achievements))s.achievements=[];s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'昇進',summary:'家臣に取り立てられた'})}if(s.age>=30&&s.clan&&s.merit>=12&&s.trust>=10&&s.rank==='家臣'){s.rank='重臣';note('家中での働きが認められ、重臣となった。');if(!Array.isArray(s.achievements))s.achievements=[];s.achievements.push({age:s.age,year:birthYear()+s.age,kind:'昇進',summary:'重臣に取り立てられた'})}rememberHighestRank(s.rank);if(s.clan){const yearlyIncome={'足軽':[0,2],'足軽大将':[1,3],'家臣':[2,4],'重臣':[3,5],'家中筆頭':[4,7],'大名':[4,6]};const range=yearlyIncome[s.rank];if(range)mod('財産',R(range[0],range[1]));}if((s.debt||0)>0){const due=s.debt;const paid=Math.min(s.stats.財産,due);mod('財産',-paid);s.debt=0;note('高利貸しへの返済期限。財産'+paid+'を返済した。'+(paid<due?'返済不足'+(due-paid)+'は取り立てられ、信用を失った。':''));if(paid<due){mod('魅力',-Math.min(12,Math.ceil((due-paid)/2)));s.tradeMerit=Math.max(0,(s.tradeMerit||0)-2)}}let illness=s.body==='病弱'?7:s.body==='丈夫'?1:3;if(R(1,100)<=Math.max(1,illness-1)+(s.age>=60?4:0)){mod('健康',-R(4,11));note('病を患い、しばらく体調を崩した。')}let mortality=(s.age<=6?(s.body==='病弱'?2:0):s.age<45?0:s.age<60?1:s.age<70?3:s.age<80?8:17);if(s.oldWarriorOath&&s.sekigaharaSide==='西軍'&&birthYear()+s.age>=1601&&birthYear()+s.age<=1615)mortality=Math.max(1,Math.floor(mortality*.4));if(s.stats.健康<20)mortality+=3;if(s.stats.健康<8)mortality+=7;if(s.body==='病弱')mortality+=s.age>=15?2:0;if(s.stats.健康<=0||R(1,100)<=mortality){s.alive=false;s.cause=s.age>=65?'病または老衰により亡くなった。':'病により亡くなった。';note(s.cause);s.phase='deathResult';s.scene={title:'病と老い',text:s.cause};s.result={text:'体調が悪化し、'+s.cause,delta:'健康 '+s.stats.健康,first:false};archive();showDeathResult();detectMilestone(beforeRank,beforeClan,beforeCastle);save();showMilestone();return}nextEvent();detectMilestone(beforeRank,renamedClan(beforeClan,birthYear()+s.age),beforeCastle);save();showMilestone()}
+function biography(){
+ const born=(s.birthName||s.name)+'は'+birthYear()+'年、'+s.region+'の'+s.house+'に生まれた。';
+ const end='享年'+s.age+'歳。'+(s.cause||'その生涯を閉じた。');
+ const records=Array.isArray(s.achievements)?s.achievements:[];
+ const rankWeight={'足軽':0,'足軽大将':1,'家臣':2,'重臣':3,'家中筆頭':4,'大名':5};
+ const rank=s.rank||'';
+ const significant=records.filter(x=>['武功','軍略','調略','昇進','大名'].includes(x.kind));
+ // 古いセーブにも対応する。選択肢の羅列ではなく、功績と到達した地位を評価する。
+ const achieved=significant.length>0||(s.merit||0)>=2||(rankWeight[rank]||0)>=1;
+ let parts=[born];const rebellionRecords=records.filter(x=>x.kind==='謀反'||x.kind==='忠節');if(rebellionRecords.length)parts.push(rebellionRecords.map(x=>x.year+'年に'+x.summary+'。').join(''));const renameRecords=records.filter(x=>x.kind==='改姓');if(renameRecords.length)parts.push(renameRecords.map(x=>x.year+'年に'+x.summary+'。').join(''));const fallenRecords=records.filter(x=>x.kind==='主家滅亡');if(fallenRecords.length)parts.push(fallenRecords.map(x=>x.year+'年に'+x.summary+'。').join(''));
+ if(s.castle)parts.push(s.castle+'を居城として領地を治め、独立した大名家を率いた。');
+ if(s.clan&&s.rank!=='大名')parts.push('成長後は'+s.clan+'に仕え、乱世の中に身を置いた。');
+ else if(records.some(x=>x.kind==='主家滅亡'||x.kind==='仕官'||x.kind==='転仕'))parts.push('主家を失った後は、浪人として新たな道を模索した。');else parts.push('生涯、武家への仕官には至らず、故郷を中心に暮らした。');
+ if(achieved){
+  const war=significant.filter(x=>x.kind==='武功');
+  const tactics=significant.filter(x=>x.kind==='軍略');
+  const plots=significant.filter(x=>x.kind==='調略');
+  if(war.length){
+   let top=war.reduce((a,b)=>(b.merit||0)>(a.merit||0)?b:a);
+   parts.push(top.year+'年には'+top.summary+'。'+(war.length>=3?'その後も戦場で働きを重ね、幾度となく功を挙げた。':''));
+  }else if((s.merit||0)>=2){parts.push('戦場で働きを重ね、一定の武功を認められた。')}
+  if(tactics.length)parts.push(tactics[0].year+'年には戦場で策を成功させ、武力だけによらぬ働きを見せた。');
+  if(plots.length)parts.push(plots[0].year+'年には他国武将の調略を成し遂げ、主家の勢力拡大に寄与した。');
+  const reached=significant.filter(x=>x.kind==='昇進');
+  if((rankWeight[rank]||0)>=1)parts.push('その働きは家中で評価され、最終的には'+rank+'の地位に至った。');
+  else if(reached.length)parts.push('かつて'+reached[reached.length-1].summary+'ものの、晩年は'+rank+'として過ごした。');
+  if(!war.length&&!tactics.length&&!plots.length&&(rankWeight[rank]||0)>=1)parts.push('長年の奉公によって地位を築いた人物であった。');
+ }else{
+  parts.push('生涯に名を残すほどの武功や目立った功績は伝わっていない。');
+  if(s.clan)parts.push('一人の奉公人として日々の務めを果たし、大きな栄達を得ることはなかった。');
+  else parts.push('大きな出世や歴史に残る事業を成すことなく、日々の暮らしを重ねた。');
+ }
+ if(s.familyMassacre)parts.push(s.familyMassacre.year+'年、主家を失った混乱の中で家族をことごとく失い、天涯孤独となった。その後も生きる道を探し続けた。');
+ if(s.successionMode)parts.push(s.successionYear+'年、息子に家督を譲り、'+(s.successionMode==='regent'?'実権を保って後見した。':'隠居して家の行く末を見守った。'));if(s.heirSon&&s.heirSon.alive===false)parts.push('息子は遠征の途上で亡くなった。');if(s.spouse)parts.push('私生活では'+s.spouse+'を妻に迎え'+(s.children?'、'+s.children+'人の子をもうけた。':'た。'));
+ parts.push(end);
+ return parts.join('');
+}
+function archive(){let a=JSON.parse(safeStore.getItem(ARCH)||'[]');if((a[0]&&a[0].id)===s.name+'-'+s.age+'-'+s.diary.length)return;a.unshift({id:s.name+'-'+s.age+'-'+s.diary.length,name:s.name,age:s.age,cause:s.cause,bio:biography()});safeStore.setItem(ARCH,JSON.stringify(a.slice(0,30)))}function showDeath(){s.phase='dead';s.scene={title:'生涯の終わり',text:s.cause};render();$('stage').textContent='人生終了';$('title').textContent=s.name+'の生涯';$('narrative').textContent=biography();$('options').innerHTML='';$('result').classList.remove('hidden');$('outcome').textContent='享年 '+s.age+'歳 ／ '+s.cause;$('deltas').textContent='過去の人生に記録されました。';$('next').textContent='新しい人生を始める';save()}
+$('begin').onclick=newLife;$('next').onclick=()=>{if(s&&s.phase==='infant'){s.eventsThisYear=s.yearLimit;nextEvent();return}if(s&&s.alive&&s.phase==='result'&&s.pendingRebellionSide){openRebellionBattle();showMilestone();return}if(!s.alive){if(s.phase==='deathResult'){showDeath();showMilestone();return}safeStore.removeItem(KEY);s=null;$('detail').classList.add('hidden');render();return}nextEvent();showMilestone()};$('restart').onclick=()=>{if(!confirm('現在の人生を終了して、新しい人生を始めますか？'))return;safeStore.removeItem(KEY);s=null;$('detail').classList.add('hidden');render()};$('profile').onclick=()=>{let x=$('detail');x.classList.remove('hidden');x.innerHTML='<h2>人物・家族</h2>';let p=document.createElement('p');p.className='story';p.textContent='生家：'+s.region+'・'+s.house+'\n旧主家：'+((s.previousService&&s.previousService.clan)?('元'+s.previousService.clan+s.previousService.rank+'（'+s.previousService.year+'年に'+s.previousService.reason+'）'):'なし')+'\n現在の身分：'+daimyoStatus()+'\n最高役職：'+(s.highestMilitaryRank||'なし')+'\n特殊な境遇：'+(s.familyMassacre?'天涯孤独（'+s.familyMassacre.year+'年）':'なし')+'\n主家再興：'+(s.houseRestoration?(s.houseRestoration.clan+'（'+({'active':'計画中','restored':'再興成功','failed':'再興失敗','abandoned':'断念'}[s.houseRestoration.status]||s.houseRestoration.status)+'）'):'なし')+'\n武士からの転身：'+(s.abandonedWarrior?(s.retiredFromWarriorYear+'年に'+s.rank+'へ転身'):'なし')+'\n謀反失敗歴：'+((s.failedRebellions||[]).map(x=>x.year+'年 '+x.clan+'（'+x.reason+'）').join('、')||'なし')+'\n体質：'+traitText()+'\n両親：'+s.parents.join('・')+'\n兄弟姉妹：'+(s.siblings.map(x=>x.relation+' '+x.name).join('、')||'なし')+'\n配偶者：'+(s.spouse||'なし')+'\n子供：'+s.children+'人'+(s.childRecords?'（'+s.childRecords.map(x=>(x.gender==='女'?'娘':'息子')+' '+x.name+(x.alive===false?'・故人':'')).join('、')+'）':'')+'\n人質：'+(currentHostage()?hostageName(currentHostage())+'（'+currentHostage().lord+'の城）':s.hostage&&s.hostage.status==='executed'?'処刑された':s.hostage&&s.hostage.status==='released'?'帰還した':'なし')+'\n後継者：'+(s.heirSon?(s.heirSon.name+(s.heirSon.alive===false?'（故人）':'（存命）')):'未定')+'\n家督譲渡：'+(s.successionMode?(s.successionYear+'年・'+(s.successionMode==='regent'?'実権維持':'完全隠居')):'未実施')+'\n家中の実権：'+(s.housePower&&s.housePower.clan===s.clan?(s.housePower.holder==='self'?'主人公':s.housePower.holder==='family'?'父・叔父':'旧友'):'なし')+'\n武功：'+(s.merit?'あり':'なし')+'\n人物評：'+(s.reputation.slice(-3).join('、')||'まだ定まっていない');x.append(p)};$('diary').onclick=()=>{let x=$('detail');x.classList.remove('hidden');x.innerHTML='<h2>人生の日記</h2>';s.diary.slice().reverse().forEach(z=>{let d=document.createElement('div');d.className='entry';d.textContent=z.year+'年　'+z.text;x.append(d)})};try{let d=safeStore.getItem(KEY);if(d){s=JSON.parse(d);if(!Array.isArray(s.achievements))s.achievements=[];if(!Array.isArray(s.failedRebellions))s.failedRebellions=[];rememberHighestRank(s.rank);if(s.previousService)rememberHighestRank(s.previousService.rank);applyHistoricalRenames(false);applyHistoricalFalls(false);applyToyotomiEmergence(false);if(s.rank==='大名'){if(s.independent!==false)s.independent=true;else if(!s.overlord)s.independent=true;const correctClan=familyName(s.name)+'家';if(s.clan!==correctClan){s.clan=correctClan;save()}}if(s.clan&&['百姓','商家','商人','下級武家','有力武家'].includes(s.rank))s.rank=['下級武家','有力武家'].includes(s.house)?'足軽大将':'足軽';if(s.phase==='dead')showDeath();else if(s.phase==='deathResult')showDeathResult();else if(s.phase==='result')showResult();else if(s.phase==='infant')showInfant();else if(s.phase==='event'&&s.pendingDefeatDecision){e=postDefeatScene();s.scene={title:e.title,text:e.text};renderScene()}else if(s.phase==='event'&&s.pendingHistoricalFall){e=historicalFallScene();s.scene={title:e.title,text:e.text};renderScene()}else if(s.phase==='event'&&s.rebellionBattleActive&&s.rebellionBattleSide){e=rebellionBattleScene(s.rebellionBattleSide);s.scene={title:e.title,text:e.text};renderScene()}else{e=null;nextEvent()}}else render();showMilestone()}catch(err){safeStore.removeItem(KEY);s=null;render()}
+})();</script></body></html>
